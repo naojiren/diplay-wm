@@ -1,0 +1,28 @@
+name: Android source checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK and legacy NDK
+        run: sdkmanager "platforms;android-37.0" "build-tools;37.0.0" "ndk;25.2.9519653"
+      - name: Check source and build applications
+        run: |
+          chmod +x gradlew
+          ./gradlew :mdnsCompat:test :shared:testDebugUnitTest :common:testDebugUnitTest :home:testDebugUnitTest \
+            :mobile:lintDebug :home:lintDebug :maphost:lintDebug \
+            :mobile:assembleDebug :home:assembleDebug :maphost:assembleDebug \
+            --no-daemon --no-configuration-cache --max-workers=1 --console=plain

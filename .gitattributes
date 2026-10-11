@@ -1,0 +1,6 @@
+# Keep documentation and workflow files portable between Windows and Linux.
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+gradlew text eol=lf
+*.bat text eol=crlf

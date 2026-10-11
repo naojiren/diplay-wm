@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Apple USB devices (0x05AC): iPhone/iAP2 configurations can change product IDs. -->
+    <usb-device vendor-id="1452" />
+    <!-- CH341 USB\VID_1A86&PID_5512&REV_0304 -->
+    <usb-device vendor-id="6790" product-id="21778" />
+    <!-- Apple -->
+    <usb-device vendor-id="1452" />
+</resources>

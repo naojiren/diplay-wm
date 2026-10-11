@@ -1,0 +1,26 @@
+{
+  "release": "v0.2.17-wm-perf18",
+  "versionName": "0.2.17-legacy.1-wm-ex5-perf18-18fps-phone-mic",
+  "versionCode": 62,
+  "package": "com.shihab.diplay.wmex5",
+  "label": "DiPlay 威马优化版",
+  "apk": "DiPlay-WM-EX5-perf18-18fps-phone-mic.apk",
+  "bytes": 15621991,
+  "sha256": "f85dfd698f92264da53b74fac23f362699e8cc39215af04f3d0497354eca3131",
+  "testedSourceCommit": "55e651c1bf987acde4c5fa6a8034146830689156",
+  "publicationChanges": [
+    "documentation",
+    "source-build CI"
+  ],
+  "unitTests": {
+    "total": 2115,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "applicationLintErrors": 0,
+  "android6RuntimeChecksPassed": true,
+  "ownerReportedSuccessfulTestingAndImprovedMicrophoneResponse": true,
+  "iphoneInputDeviceIndependentlyVerified": false,
+  "apkRebuiltForPublication": false
+}

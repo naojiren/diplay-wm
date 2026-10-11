@@ -1,0 +1,8 @@
+JmDNS 3.6.3
+https://github.com/jmdns/jmdns
+Apache License, Version 2.0 (see LICENSE and the source headers).
+
+This copy is derived from the org.jmdns:jmdns:3.6.3 source JAR.
+DiPlay WM modifications: open the multicast socket without binding, enable
+SO_REUSEADDR, and then bind; close the socket on construction failure.
+All service discovery and protocol behavior is otherwise unchanged.
