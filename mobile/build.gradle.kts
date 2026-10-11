@@ -4,6 +4,10 @@ plugins {
     alias(libs.plugins.android.application)
 }
 
+// The WM EX5 head unit uses 32-bit ARMv7. Opt in to other ABIs for emulators.
+val wmUniversalAbis = providers.gradleProperty("wmUniversalAbis")
+    .map { it.toBooleanStrict() }.getOrElse(false)
+
 // Optional local-only input. CI and ordinary source builds contain no accessory identity.
 val localAuthenticationAssets = providers.environmentVariable("DIPLAY_AUTH_ASSETS_DIR")
     .orNull?.let { file(it).canonicalFile }
@@ -24,7 +28,13 @@ android {
         versionCode = 62
         versionName = "0.2.17-legacy.1"
         testInstrumentationRunner = "com.shilapi.xcertplay.WmAuthenticationInstrumentation"
-
+        ndk {
+            abiFilters += if (wmUniversalAbis) {
+                setOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            } else {
+                setOf("armeabi-v7a")
+            }
+        }
     }
 
 

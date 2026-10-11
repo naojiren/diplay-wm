@@ -6,7 +6,9 @@ A DiPlay Legacy Android variant adapted for a 2019 WM Motor EX5 head unit runnin
 
 [Download the latest APK](https://github.com/naojiren/diplay-wm/releases/latest) · [Releases](https://github.com/naojiren/diplay-wm/releases) · [Issues](https://github.com/naojiren/diplay-wm/issues)
 
-Install on the head unit, not the iPhone. The current release is the original tested **perf18** APK, version code **62**, package **com.shihab.diplay.wmex5**. It has not been slimmed or rebuilt for this publication.
+Install on the head unit, not the iPhone. The current release is **perf18 ARMv7**, version code **62**, package **com.shihab.diplay.wmex5**. It retains the perf18 features and settings while packaging only the head unit's `armeabi-v7a` libraries. The original tested four-architecture APK remains available in the earlier release.
+
+See the [ARMv7 build notes](docs/WM_EX5_ARMV7.md) for size and payload verification.
 
 ## Defaults and features
 
@@ -20,7 +22,7 @@ The upgrade applies the perf18 frame-rate, transport, channel and microphone def
 
 ## Compatibility and validation
 
-Minimum SDK 19 (Android 4.4); the primary physical target is the 2019 EX5 / Android 6.0.1 / TI DRA74x. Other head units remain unverified. The original release includes ARMv7, ARM64, x86 and x86_64; the EX5 uses ARMv7.
+Minimum SDK 19 (Android 4.4); the primary physical target is the 2019 EX5 / Android 6.0.1 / TI DRA74x with a 32-bit ARMv7 system. The slim APK includes only ARMv7. Removing unused architectures reduces download and storage size; it does not itself reduce video latency. This slim build has not had a new physical-vehicle test. Other head units remain unverified.
 
 The release passed 2,115 unit tests, three application lint checks and Android 6 dual-display/audio runtime checks. The owner reported successful testing and improved microphone response. This does not independently establish which iPhone input device was selected. See [release details](docs/WM_EX5_PERF18.md).
 
@@ -28,8 +30,8 @@ USB depends on firmware driver compatibility and the Android VPN authorization c
 
 ## Build and provenance
 
-See [build instructions](docs/BUILD.md). Public source excludes runtime identity inputs, APK signing keys and user pairing data. A source-only build is available with `./gradlew :mobile:assembleDebug`; a standalone build requires explicit authentication input.
+See [build instructions](docs/BUILD.md). Public source excludes runtime identity inputs, APK signing keys and user pairing data. A source-only ARMv7 build is available with `./gradlew :mobile:assembleDebug`; a standalone build requires explicit authentication input. Add `-PwmUniversalAbis=true` for a four-architecture build or x86 emulator instrumentation.
 
 Based on [DiPlay Legacy Android](https://github.com/programmerguohuajing/DiPlay-Legacy-Android), [DiPlay](https://github.com/shihabal3amri/DiPlay) and [xcertplay](https://github.com/shilapi/xcertplay). GPL-3.0 receiver and AGPL-3.0-derived UI notices, as well as separate dependency/asset terms, are preserved in [LICENSE](LICENSE) and [third-party notices](docs/THIRD_PARTY_NOTICES.md).
 
-This is not an Apple-certified product. The APK contains the existing experimental accessory identity described in [SECURITY.md](SECURITY.md); it is extractable and future acceptance is not guaranteed. The APK signing private key is not included. Runtime source matches tested local commit `55e651c1bf987acde4c5fa6a8034146830689156`; publication adds documentation and CI only.
+This is not an Apple-certified product. The APK contains the existing experimental accessory identity described in [SECURITY.md](SECURITY.md); it is extractable and future acceptance is not guaranteed. The APK signing private key is not included. Runtime source matches tested local commit `55e651c1bf987acde4c5fa6a8034146830689156`; later changes add documentation, CI and ARMv7 build filtering.

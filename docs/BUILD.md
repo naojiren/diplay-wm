@@ -76,6 +76,22 @@ mobile/build/outputs/apk/debug/mobile-debug.apk
 The debug application ID is `com.shihab.diplay.wmex5`.
 The published WM APK uses the debug build variant with debugging disabled. The generic release variant uses `com.shihab.diplay`; use the WM debug variant to retain the WM profile and package.
 
+### Head-unit architecture
+
+The default build includes only `armeabi-v7a`, the 32-bit ARM architecture of the
+2019 EX5 / TI DRA74x head unit. This filters both the native libraries built in
+this repository and native dependencies such as Conscrypt. Features, audio,
+authentication, version code and settings are unchanged.
+
+For an x86 emulator or a four-architecture development APK, opt in explicitly:
+
+```sh
+./gradlew -PwmUniversalAbis=true :mobile:assembleDebug
+```
+
+Use the same property for emulator instrumentation builds. The universal option
+includes ARMv7, ARM64, x86 and x86_64; the car does not need the latter three.
+
 The source APK contains no accessory identity unless you supply runtime authentication assets.
 Standalone CarPlay needs these assets to connect to an iPhone.
 Use the car-test procedure below for that purpose.

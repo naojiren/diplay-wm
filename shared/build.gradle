@@ -1,6 +1,15 @@
 plugins {
     id 'com.android.library'
 }
+// Match the application filter so unused native targets are not built either.
+def wmUniversalAbis = providers.gradleProperty('wmUniversalAbis')
+        .map { value ->
+            if (!(value in ['true', 'false'])) {
+                throw new GradleException('wmUniversalAbis must be true or false')
+            }
+            value == 'true'
+        }.getOrElse(false)
+
 android {
     namespace = 'com.shilapi.xcertplay.shared'
     compileSdk = 37
@@ -11,7 +20,9 @@ android {
         multiDexEnabled true
 
         ndk {
-            abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64', 'x86'
+            abiFilters.addAll(wmUniversalAbis
+                    ? ['armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64']
+                    : ['armeabi-v7a'])
         }
 
         externalNativeBuild {
