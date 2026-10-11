@@ -202,8 +202,10 @@ class UsbReadQueueCompatibilityTest {
     }
 
     private fun readChunk(ncm: NcmUsbBridge): Int? = try {
+        // These assertions cover queue compatibility, not scheduling latency. Cold
+        // Robolectric sandboxes can take over 100 ms to start requestWait on CI.
         NcmUsbBridge::class.java.getDeclaredMethod("readChunk", Long::class.javaPrimitiveType)
-            .apply { isAccessible = true }.invoke(ncm, 100L) as Int?
+            .apply { isAccessible = true }.invoke(ncm, 5_000L) as Int?
     } catch (error: InvocationTargetException) { throw error.targetException }
 
     private fun pipe(onDiagnostic: (String) -> Unit = {}) =
