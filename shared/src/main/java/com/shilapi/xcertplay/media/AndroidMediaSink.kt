@@ -18,7 +18,6 @@ import androidx.annotation.RequiresApi
 import com.shilapi.xcertplay.airplay.AudioCodecKind
 import com.shilapi.xcertplay.airplay.AudioFormat
 import com.shilapi.xcertplay.airplay.AudioStreamId
-import com.shilapi.xcertplay.airplay.BufferedAudioStream
 import com.shilapi.xcertplay.airplay.MediaSink
 import com.shilapi.xcertplay.airplay.MicrophoneConfig
 import com.shilapi.xcertplay.airplay.VideoCodec
@@ -26,10 +25,12 @@ import com.shilapi.xcertplay.airplay.toHexString
 import java.io.Closeable
 import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.TimeUnit
 
 /** AudioTrack's attributes getter is only available from Android 10. */
 internal fun audioTrackAttributesForFocus(track: AudioTrack, configured: AudioAttributes): AudioAttributes =
@@ -1349,12 +1350,7 @@ private class AudioRenderer(
 
     private var trackAttributes: AudioAttributes? = null
     private var mappedChannel: AudioChannel? = null
-    private val isMedia = mappedSelection().channel == AudioChannel.MEDIA
-    private val playbackBufferMillis = MediaAudioBuffer.playbackMillis(
-        mediaBufferMillis, format.payloadType == BufferedAudioStream.STREAM_TYPE)
-    private val queueLimitMillis = MediaAudioBuffer.queueLimitMillis(isMedia, playbackBufferMillis)
-    private val bufferTailWaitNs = MediaAudioBuffer.tailWaitMillis(isMedia, playbackBufferMillis) * 1_000_000L
-    private val queue = AudioPacketQueue<AudioPacket>(MAX_QUEUED_PACKETS, format.sampleRate.coerceAtLeast(1), queueLimitMillis)
+    private val queue = LinkedBlockingQueue<AudioPacket>(MAX_QUEUED_PACKETS)
     @Volatile private var running = true
     @Volatile private var started = false
     private var codec: MediaCodec? = null
@@ -1378,8 +1374,6 @@ private class AudioRenderer(
     private val packetsReceived = AtomicInteger()
     private val packetsDropped = AtomicInteger()
     private val lastArrivalNs = AtomicLong()
-    private val firstArrivalNs = AtomicLong()
-    private var firstPlaybackReported = false
     private val maxArrivalGapMs = AtomicLong()
     private val frameBytes = if (format.channels >= 2) 4 else 2
     private var totalWrittenFrames = 0L
@@ -1412,11 +1406,10 @@ private class AudioRenderer(
         if (started) {
             packetsReceived.incrementAndGet()
             val now = System.nanoTime()
-            firstArrivalNs.compareAndSet(0L, now)
             val previous = lastArrivalNs.getAndSet(now)
             if (previous != 0L) maxArrivalGapMs.accumulateAndGet((now - previous) / 1_000_000L, ::maxOf)
         }
-        if (!started || !queue.offer(AudioPacket(rtp, sample), sample)) {
+        if (!started || !queue.offer(AudioPacket(rtp, sample))) {
             if (started) packetsDropped.incrementAndGet()
             if (started && !droppedPacketsLogged) {
                 droppedPacketsLogged = true
@@ -1447,7 +1440,7 @@ private class AudioRenderer(
             requestAudioFocus()
             while (running) {
                 diagnosticStage = "packet"
-                queue.poll(AUDIO_POLL_MILLIS)?.let(::handle)
+                queue.poll(AUDIO_POLL_MILLIS, TimeUnit.MILLISECONDS)?.let(::handle)
                 // Output becomes ready asynchronously, including after the last packet of a burst.
                 // Waiting for the next UDP packet can strand decoded sound for hundreds of ms.
                 diagnosticStage = "decoder-output"
@@ -1537,7 +1530,7 @@ private class AudioRenderer(
         var attributes = audioAttributesFor(selection, streamOverride)
         trackAttributes = attributes
         val plan = MediaAudioBuffer.plan(selection.channel == AudioChannel.MEDIA,
-            format.sampleRate, format.channels, minBuffer, playbackBufferMillis)
+            format.sampleRate, format.channels, minBuffer, mediaBufferMillis)
         bytesPerSecond = format.sampleRate * frameBytes
         val built: AudioTrack
         var routeLabel: String
@@ -1971,14 +1964,6 @@ private class AudioRenderer(
         underrunsAtPlaybackStart = track.compatUnderruns()
         track.play()
         playbackStarted = true
-        if (!firstPlaybackReported) {
-            firstPlaybackReported = true
-            val receivedAt = firstArrivalNs.get()
-            runCatching { report("Audio: first play audioType=${format.audioType} " +
-                "sinceFirstRxMs=${if (receivedAt == 0L) -1 else (System.nanoTime() - receivedAt) / 1_000_000L} " +
-                "mediaBufferSettingMs=$mediaBufferMillis effectiveBufferSettingMs=$playbackBufferMillis " +
-                "queueLimitMs=${queueLimitMillis ?: -1}") }
-        }
     }
 
     private fun maintainPlaybackBuffer() {
@@ -1994,7 +1979,7 @@ private class AudioRenderer(
         }
         // A short final burst may never reach the start threshold. Play it after a bounded wait.
         if (!playbackStarted && prebufferBytes > 0 && queue.isEmpty() &&
-            System.nanoTime() - lastPcmWriteNs >= bufferTailWaitNs) {
+            System.nanoTime() - lastPcmWriteNs >= BUFFER_TAIL_WAIT_NS) {
             startPlayback(track)
         }
     }
@@ -2015,8 +2000,6 @@ private class AudioRenderer(
             previous?.let { (current - it) and 0xffff_ffffL }
         }
         val queuedFrames = playbackHeadFrames?.let { (totalWrittenFrames - it).coerceAtLeast(0L) }
-        val queueSnapshot = queue.snapshotAndResetEvictions()
-        packetsDropped.addAndGet(queueSnapshot.evicted)
         val line = "audio stats audioType=${format.audioType} channel=$mappedChannel " +
             "routeType=${currentTrack?.routedDevice?.type ?: -1} codec=${format.codec} " +
             "trackState=${currentTrack?.state ?: -1} playState=${currentTrack?.playState ?: -1} " +
@@ -2034,18 +2017,6 @@ private class AudioRenderer(
             "decoderDroppedTotal=$inputDropped outputBuffersTotal=$outputBuffers rebuffers=$rebufferCount ended=$force"
         Log.i(STATS_TAG, line)
         report(line)
-        if (isMedia) runCatching {
-            val latencyLine = "Audio: latency audioType=${format.audioType} " +
-                "mode=${if (queueLimitMillis != null) "bounded-media" else "stable"} " +
-                "settingMs=$mediaBufferMillis effectiveSettingMs=$playbackBufferMillis " +
-                "queueLimitMs=${queueLimitMillis ?: -1} " +
-                "packetQueue=${queueSnapshot.size} packetQueueAgeMs=${queueSnapshot.oldestAgeMs} " +
-                "packetQueueSpanMs=${queueSnapshot.spanMs} " +
-                "trackQueuedMs=${queuedFrames?.let { it * 1000L / format.sampleRate } ?: -1} " +
-                "evictedOldest=${queueSnapshot.evicted} ended=$force"
-            Log.i(STATS_TAG, latencyLine)
-            report(latencyLine)
-        }
         if (format.codec != AudioCodecKind.LPCM) {
             // Keep this separate: the exported diagnostic recorder caps each line at 700 characters.
             val decoderLine = "Audio: decoder stats audioType=${format.audioType} codec=${format.codec} " +
@@ -2141,8 +2112,8 @@ private class AudioRenderer(
         const val OPUS_SEEK_PRE_ROLL_NANOS = 80_000_000L
         const val INPUT_TIMEOUT_US = 10_000L
         const val AUDIO_POLL_MILLIS = 10L
-        // Speech and the 300/500/1000 ms media presets retain the original FIFO capacity.
-        // Short media presets additionally bound RTP duration and packet age in AudioPacketQueue.
+        const val BUFFER_TAIL_WAIT_NS = 500_000_000L
+        // Holds a burst after a Wi-Fi gap (~4 s of AAC) instead of dropping it.
         const val MAX_QUEUED_PACKETS = 192
         const val PREBUFFER_WRITE_CHUNK_BYTES = 2 * 1024
         const val STATS_TAG = "DiPlay-AudioStats"

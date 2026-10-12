@@ -258,7 +258,7 @@
     <string name="music_buffer">音乐缓冲</string>
     <string name="settings_media_buffer_ms">%1$d 毫秒</string>
     <string name="settings_media_buffer_default">%1$s · 默认</string>
-    <string name="settings_media_buffer_description">100／150 毫秒响应更快，但 Wi-Fi 不稳定时可能短暂断音。较大的缓冲更连贯，也会增加延迟。更改在下次连接 CarPlay 时生效。</string>
+    <string name="settings_media_buffer_description">较大的缓冲有助于减少断音，默认 300 毫秒。修改后在下次连接时生效。</string>
     <string name="resolution_native">原生</string>
     <string name="navigation_on_hud_and_instrument_cluster">HUD和仪表盘导航</string>
     <string name="navigation_stream_type">导航音频流类型</string>

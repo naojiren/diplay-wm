@@ -16,7 +16,7 @@ class DiPlayApplication : MultiDexApplication() {
     override fun onCreate() {
         super.onCreate()
         WmEx5OptimizedDefaults.applyOnce(this)
-        WmEx5MediaLatencyDefaults.applyOnce(this)
+        WmEx5StableDefaults.applyOnce(this)
         setupCrashHandler()
     }
 

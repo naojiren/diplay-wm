@@ -1,0 +1,77 @@
+{
+  "modules": {
+    "shared": {
+      "tests": 1147,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "common": {
+      "tests": 982,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "samples/home": {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "compat/jmdns": {
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "lint": {
+    "mobile": {
+      "warning": 27
+    },
+    "samples/home": {
+      "warning": 5
+    },
+    "samples/maphost": {
+      "warning": 2
+    }
+  },
+  "installedOnVehicle": false,
+  "physicalAudioDelayMeasured": false,
+  "bytes": 12849049,
+  "sha256": "e0abff37c9e1e8f0f9bd5049c83ed65786af51ebc44c45b30100dcf3cc5349fa",
+  "abis": [
+    "armeabi-v7a"
+  ],
+  "nativeLibraries": [
+    "lib/armeabi-v7a/libconscrypt_jni.so",
+    "lib/armeabi-v7a/liblegacy_ncm_claim.so",
+    "lib/armeabi-v7a/liblocal_hotspot_radio.so",
+    "lib/armeabi-v7a/libspeex_echo.so",
+    "lib/armeabi-v7a/libusb_host_compat.so",
+    "lib/armeabi-v7a/libxcertplay_i2c.so"
+  ],
+  "apk": "DiPlay-WM-EX5-perf21-stable-armv7.apk",
+  "versionCode": 65,
+  "versionName": "0.2.17-legacy.1-wm-ex5-perf21-stable",
+  "applicationId": "com.shihab.diplay.wmex5",
+  "buildCompleted": true,
+  "fullValidationCompleted": true,
+  "date": "2026-10-13",
+  "sourceBranch": "wm-ex5-perf21-stable-branding",
+  "audioImplementationRestoredFrom": "6cfcb264a8904dfffd9e24127e4282dc3dc762ef",
+  "changes": [
+    "restored perf19 audio buffers and FIFO; removed 100/150 ms experiment",
+    "one-time upgrade music buffer=300 ms; auto-connect on open=false",
+    "WM model=EX5; OEM label=Weltmeister",
+    "silver five-bar WM AirPlay return icon with matching settings preview",
+    "launcher icon: dominant silver five-bar WM emblem with an integrated cyan C/play swoosh on midnight blue"
+  ],
+  "launcherIconDensityVariantsValidated": true,
+  "manifestUsesNewAppIcon": true,
+  "physicalAudioContinuityTestPassed": null,
+  "githubUploaded": false,
+  "sameSigningCertificateAsPerf19": true,
+  "sameAuthenticationAssetsAsPerf19": true,
+  "signingCertificateSha256": "89a94fd5d7d32fdd26d81c3827c74bb3dc215af91d1fcff0661fd8e1d2c13509"
+}

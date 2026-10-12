@@ -11,6 +11,8 @@ internal object WmEx5PerformanceProfile {
     val frameRates = com.shilapi.xcertplay.airplay.AirPlayDisplaySettings.FPS_VALUES.filter { it >= 12 }
     val CHANNELS = listOf(36, 44, 157, 1, 6)
     const val MANUFACTURER = "威马"
+    const val MODEL = "EX5"
+    const val OEM_LABEL = "Weltmeister"
     private const val PREFS = "diplay_wm_ex5_performance"
     fun isTestPackage(context: Context): Boolean = context.packageName == PACKAGE
     fun enabled(context: Context): Boolean = isTestPackage(context) &&

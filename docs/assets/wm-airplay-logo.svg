@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>WM EX5 silver five-bar CarPlay return icon</title>
+  <defs>
+    <linearGradient id="silver" x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#f3f5f7"/>
+      <stop offset="0.4" stop-color="#bcc4cc"/>
+      <stop offset="0.55" stop-color="#87939f"/>
+      <stop offset="1" stop-color="#dce1e6"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="256" height="256" rx="44" fill="#11151c"/>
+  <g fill="url(#silver)">
+    <rect x="40" y="70" width="24" height="116" rx="12"/>
+    <rect x="78" y="92" width="24" height="116" rx="12"/>
+    <rect x="116" y="70" width="24" height="116" rx="12"/>
+    <rect x="154" y="48" width="24" height="116" rx="12"/>
+    <rect x="192" y="70" width="24" height="116" rx="12"/>
+  </g>
+</svg>

@@ -250,7 +250,7 @@
     <string name="music_buffer">ذاكرة الموسيقى</string>
     <string name="settings_media_buffer_ms">%1$d مللي ثانية</string>
     <string name="settings_media_buffer_default">%1$s · الافتراضي</string>
-    <string name="settings_media_buffer_description">تستجيب 100/150 مللي ثانية بسرعة أكبر، لكن قد تنقطع الموسيقى عند عدم استقرار Wi-Fi. تزيد الذاكرة الأكبر استمرارية الصوت والتأخير. تسري التغييرات عند اتصال CarPlay التالي.</string>
+    <string name="settings_media_buffer_description">يساعد المخزن الأكبر على تقليل انقطاع الصوت. القيمة الافتراضية 300 مللي ثانية. يُطبّق عند الاتصال التالي.</string>
     <string name="resolution_native">أصلي</string>
     <string name="navigation_on_hud_and_instrument_cluster">الملاحة على شاشة العرض الأمامية ولوحة العدادات</string>
     <string name="navigation_stream_type">نوع بث الملاحة</string>

@@ -2,6 +2,7 @@ package com.shilapi.xcertplay
 
 import android.content.Context
 import android.os.Build
+import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.airplay.AirPlayDisplaySettings
 import com.shilapi.xcertplay.airplay.AirPlayPhysicalSizeBasis
 import com.shilapi.xcertplay.airplay.CarPlayDisplayScale
@@ -459,7 +460,7 @@ object AirPlayPersistence {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getString(KEY_MODEL, null)
             ?.takeIf { it.isNotBlank() }
-            ?: DEFAULT_MODEL
+            ?: if (WmEx5PerformanceProfile.isTestPackage(context)) WmEx5PerformanceProfile.MODEL else DEFAULT_MODEL
 
     fun saveModel(context: Context, model: String) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
@@ -469,9 +470,11 @@ object AirPlayPersistence {
 
     fun loadOemLabel(context: Context): String =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(KEY_OEM_LABEL, DEFAULT_OEM_LABEL)
+            .getString(KEY_OEM_LABEL, null)
             // iOS hides the car icon without a label.
-            .orEmpty().ifBlank { DEFAULT_OEM_LABEL }
+            .orEmpty().ifBlank {
+                if (WmEx5PerformanceProfile.isTestPackage(context)) WmEx5PerformanceProfile.OEM_LABEL else DEFAULT_OEM_LABEL
+            }
 
     fun saveOemLabel(context: Context, oemLabel: String) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
@@ -523,13 +526,8 @@ object AirPlayPersistence {
 
     fun loadMediaBufferMillis(context: Context): Int = com.shilapi.xcertplay.media.MediaAudioBuffer.sanitize(
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getInt(KEY_MEDIA_BUFFER_MS, defaultMediaBufferMillis(context)),
+            .getInt(KEY_MEDIA_BUFFER_MS, com.shilapi.xcertplay.media.MediaAudioBuffer.DEFAULT_MILLIS),
     )
-
-    fun defaultMediaBufferMillis(context: Context): Int =
-        if (WmEx5PerformanceProfile.isTestPackage(context)) {
-            com.shilapi.xcertplay.media.MediaAudioBuffer.LOW_LATENCY_DEFAULT_MILLIS
-        } else com.shilapi.xcertplay.media.MediaAudioBuffer.DEFAULT_MILLIS
 
     /** CarPlay's buffered music (Apple Music sends ahead over TCP); off by default, applies at reconnect. */
     fun loadMainBufferedAudio(context: Context): Boolean =
@@ -911,6 +909,9 @@ object AirPlayPersistence {
 
     fun loadCustomAirPlayIconFile(context: Context): File? =
         File(context.filesDir, CUSTOM_ICON_FILE).takeIf { it.isFile }
+
+    fun defaultAirPlayIconResource(context: Context): Int =
+        if (WmEx5PerformanceProfile.isTestPackage(context)) R.raw.wm_car_home else R.raw.ic_car_home
 
     fun saveCustomAirPlayIcon(context: Context, encodedImage: ByteArray) {
         require(encodedImage.isNotEmpty()) { "AirPlay icon data must not be empty" }

@@ -1466,7 +1466,7 @@ class DiPlayActivity : ComponentActivity() {
             val bufferPresets = com.shilapi.xcertplay.media.MediaAudioBuffer.presets
             val bufferLabels = bufferPresets.map { millis ->
                 val label = getString(R.string.settings_media_buffer_ms, millis)
-                if (millis == AirPlayPersistence.defaultMediaBufferMillis(this)) {
+                if (millis == com.shilapi.xcertplay.media.MediaAudioBuffer.DEFAULT_MILLIS) {
                     getString(R.string.settings_media_buffer_default, label)
                 } else label
             }
@@ -3839,7 +3839,7 @@ class DiPlayActivity : ComponentActivity() {
         val custom = AirPlayPersistence.loadCustomAirPlayIconFile(this)?.let { BitmapFactory.decodeFile(it.absolutePath) }
         val preview = row().apply { gravity = Gravity.CENTER_VERTICAL }
         preview.addView(ImageView(this).apply {
-            setImageBitmap(custom ?: BitmapFactory.decodeResource(resources, R.raw.ic_car_home))
+            setImageBitmap(custom ?: BitmapFactory.decodeResource(resources, AirPlayPersistence.defaultAirPlayIconResource(this@DiPlayActivity)))
             scaleType = ImageView.ScaleType.CENTER_CROP
             background = rounded(SURFACE, BORDER)
             clipToOutline = true

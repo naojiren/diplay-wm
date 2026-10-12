@@ -250,7 +250,7 @@
     <string name="music_buffer">Búfer de música</string>
     <string name="settings_media_buffer_ms">%1$d ms</string>
     <string name="settings_media_buffer_default">%1$s · predeterminado</string>
-    <string name="settings_media_buffer_description">100/150 ms ofrece una respuesta más rápida, pero puede interrumpir la música si el Wi-Fi es inestable. Un búfer mayor mejora la continuidad y aumenta el retraso. Los cambios se aplican en la próxima conexión de CarPlay.</string>
+    <string name="settings_media_buffer_description">Un búfer mayor ayuda a evitar cortes de audio. El valor predeterminado es 300 ms. Se aplica en la próxima conexión.</string>
     <string name="resolution_native">Nativa</string>
     <string name="navigation_on_hud_and_instrument_cluster">Navegación en HUD y panel de instrumentos</string>
     <string name="navigation_stream_type">Tipo de flujo de navegación</string>
