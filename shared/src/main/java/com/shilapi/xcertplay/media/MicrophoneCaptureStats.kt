@@ -25,6 +25,8 @@ internal class MicrophoneCaptureStats(
     private var readMaxNs = 0L
     private var encodedFrames = 0L
     private var emptyEncodedFrames = 0L
+    private var silentFrames = 0L
+    private var nonzeroFrames = 0L
     private var udpSent = 0L
     private var sendErrors = 0L
     private var lastSentNs: Long? = null
@@ -56,6 +58,11 @@ internal class MicrophoneCaptureStats(
         emptyEncodedFrames += emptyCount.coerceAtLeast(0)
     }
 
+    /** Count all-zero frames without retaining samples or changing capture sources. */
+    fun frameSilent(silent: Boolean) {
+        if (silent) silentFrames++ else nonzeroFrames++
+    }
+
     fun sent() {
         val now = nowNs()
         lastSentNs?.let { sendGapMaxNs = maxOf(sendGapMaxNs, (now - it).coerceAtLeast(0)) }
@@ -77,7 +84,8 @@ internal class MicrophoneCaptureStats(
             "captureBytes=$capturedBytes reads=$reads zeroReads=$zeroReads readErrors=$readErrors " +
             "readMaxMs=${readMaxNs / 1_000_000} encodedFrames=$encodedFrames " +
             "emptyEncodedFrames=$emptyEncodedFrames udpSent=$udpSent sendErrors=$sendErrors " +
-            "sendGapMaxMs=${sendGapMaxNs / 1_000_000} ended=$ended")
+            "sendGapMaxMs=${sendGapMaxNs / 1_000_000} " +
+            "silentFrames=$silentFrames nonzeroFrames=$nonzeroFrames ended=$ended")
         windowStart = now
         capturedBytes = 0
         reads = 0
@@ -86,6 +94,8 @@ internal class MicrophoneCaptureStats(
         readMaxNs = 0
         encodedFrames = 0
         emptyEncodedFrames = 0
+        silentFrames = 0
+        nonzeroFrames = 0
         udpSent = 0
         sendErrors = 0
         sendGapMaxNs = 0

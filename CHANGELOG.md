@@ -1,3 +1,9 @@
+# WM EX5 perf19 — 2026-10-12
+
+- 解决语音输入和输出切换问题：恢复车机麦克风采集，增加软件 Opus 编码回退，并修复 Android 6 的 Siri 播放兼容性。
+- 车主实车确认 ChatGPT 语音对话和 Siri 地图导航恢复正常；保留威马双屏、网络与低延迟适配。
+- 版本代码 63，仅 ARMv7；按车主要求跳过剩余自动检查，完整 CI 通过状态不作声明。见 [发布说明](docs/WM_EX5_PERF19.md)。
+
 # DiPlay 0.2.14 — 2026-10-07
 
 - Group Settings by driver goal with search, adaptive layouts, quick controls and reconnect notices (#369).

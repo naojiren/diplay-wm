@@ -3823,6 +3823,10 @@ class CarPlayHostActivity : ComponentActivity() {
     ): AndroidMediaSink {
         // Capture this session's log: late decoder shutdown must not write into a new session.
         val diagnosticLog = sessionLog
+        val captureEnabled = microphoneAvailable && !WmEx5PerformanceProfile.phoneMicrophoneOnly(this)
+        AsyncDiagnosticLog.append(diagnosticLog,
+            "Microphone: configuration captureEnabled=$captureEnabled permission=$microphoneAvailable " +
+                "opusEncoderAvailable=${com.shilapi.xcertplay.media.OpusEncoderSupport.isAvailable()}")
         return AndroidMediaSink(
             surface = null,
             videoWidth = videoWidth,
@@ -3854,7 +3858,7 @@ class CarPlayHostActivity : ComponentActivity() {
             lowLatencyVideo = lowLatencyVideo,
             // Keep microphone negotiation and all playback routing unchanged. The iPhone owns
             // input-device selection; this experiment only prevents head-unit capture.
-            microphoneCaptureEnabled = microphoneAvailable && !WmEx5PerformanceProfile.phoneMicrophoneOnly(this),
+            microphoneCaptureEnabled = captureEnabled,
         )
     }
 

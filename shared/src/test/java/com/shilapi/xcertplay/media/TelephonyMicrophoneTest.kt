@@ -106,6 +106,34 @@ class TelephonyMicrophoneTest {
         assertTrue(ShadowAudioEffect.getAudioEffects().isEmpty())
     }
 
+    @Test
+    @Config(sdk = [23])
+    fun softwareOpusStartsCaptureOnAndroidSixAndReportsItsImplementation() {
+        val diagnostics = CopyOnWriteArrayList<String>()
+        val uplink = MicrophoneUplink(config("speechrecognition").copy(
+            codec = AudioCodecKind.OPUS, sampleRate = 48_000),
+            onDiagnostic = diagnostics::add, opusEncoderFactory = { SoftwareOpusEncoder(it) })
+        try {
+            assertTrue(uplink.start())
+            assertEquals(AudioRecord.RECORDSTATE_RECORDING, awaitCapture().recordingState)
+            assertTrue(diagnostics.any { it.contains("codec=OPUS implementation=software") })
+        } finally { uplink.close() }
+    }
+
+    @Test fun missingEncodersStopCaptureBeforeOpeningTheMicrophoneAndAllowRetry() {
+        val diagnostics = CopyOnWriteArrayList<String>()
+        var attempts = 0
+        val uplink = MicrophoneUplink(config("telephony").copy(codec = AudioCodecKind.OPUS),
+            onDiagnostic = diagnostics::add, opusEncoderFactory = { attempts++; null })
+        try {
+            assertFalse(uplink.start())
+            assertFalse(uplink.start())
+            assertEquals(2, attempts)
+            assertNull(recorder.get())
+            assertEquals(2, diagnostics.count { it.contains("stage=ENCODER") })
+        } finally { uplink.close() }
+    }
+
     @Test fun telephonyEnablesEffectsOnItsRecorderAndRestoresThePreviousMode() {
         manager.mode = AudioManager.MODE_RINGTONE
         sink.onMicrophoneStarted(telephony, config("telephony"))

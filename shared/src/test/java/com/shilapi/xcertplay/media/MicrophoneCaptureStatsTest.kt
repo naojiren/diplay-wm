@@ -102,6 +102,20 @@ class MicrophoneCaptureStatsTest {
         assertTrue(reports.drop(1).all { it.contains("type=speechrecognition source=VOICE_COMMUNICATION") })
     }
 
+    @Test fun distinguishesAllZeroFramesFromAudioAndResetsEachWindow() {
+        var now = 0L
+        val reports = mutableListOf<String>()
+        val stats = MicrophoneCaptureStats(config, reports::add) { now }
+        stats.frameSilent(true)
+        stats.frameSilent(false)
+        stats.frameSilent(false)
+        now = 5_000_000_000L
+        stats.flush()
+        assertTrue(reports.last().contains("silentFrames=1 nonzeroFrames=2"))
+        stats.flush(ended = true)
+        assertTrue(reports.last().contains("silentFrames=0 nonzeroFrames=0"))
+    }
+
     @Test fun outputContainsOnlyAllowlistedMetadataAndNeverExceptionMessagesOrEndpoints() {
         val reports = mutableListOf<String>()
         val privateConfig = config.copy(audioType = "PRIVATE_PHONE_NAME\nsecret=value")

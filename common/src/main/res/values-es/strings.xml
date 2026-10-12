@@ -677,6 +677,6 @@
     <string name="connection_stage_elapsed">Etapa actual · %1$d segundos</string>
     <string name="connection_stage_stalled">Esperando en esta etapa durante %1$d segundos</string>
     <string name="settings_fps_24">24 fps</string>
-    <string name="settings_phone_microphone_only">Solo micrófono del teléfono (experimental)</string>
+    <string name="settings_phone_microphone_only">Desactivar micrófono del coche (experimental)</string>
     <string name="settings_phone_microphone_only_description">Desactiva la grabación del coche y mantiene la reproducción. El iPhone elige la entrada; selecciona iPhone en sus controles de audio si está disponible. Si Siri no te oye, desactívalo. Se aplica en la próxima conexión.</string>
 </resources>

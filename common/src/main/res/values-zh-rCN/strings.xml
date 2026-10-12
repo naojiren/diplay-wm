@@ -737,6 +737,6 @@
     <string name="connection_stage_elapsed">当前阶段 · %1$d 秒</string>
     <string name="connection_stage_stalled">当前阶段已等待 %1$d 秒</string>
     <string name="settings_fps_24">24 帧/秒</string>
-    <string name="settings_phone_microphone_only">仅使用手机麦克风（实验性）</string>
+    <string name="settings_phone_microphone_only">停用车机麦克风（实验性）</string>
     <string name="settings_phone_microphone_only_description">停止车机采音，保持声音输出不变。输入设备由 iPhone 决定；手机音频控制中有输入源选项时，请选择 iPhone。若 Siri 听不到声音，请关闭此项。下次连接生效。</string>
 </resources>

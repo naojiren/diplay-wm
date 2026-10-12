@@ -47,3 +47,7 @@ The static site layout, CSS and generator adapt DiAuto (AGPL-3.0). The AGPL lice
 Required Notice: Copyright AndyShaman (https://github.com/AndyShaman/BYDMate)
 
 The maneuver PNGs under `shared/src/main/assets/byd-hud-icons` were imported from BYDMate. Its PolyForm Noncommercial 1.0.0 terms and required notice are included alongside the assets. These files are separate from the project code license; upstream describes them as donor assets and their original provenance is not independently established. The validated DiLink5.1 windshield path uses factory turn codes rather than these images.
+
+## Software Opus microphone encoding
+
+perf19 vendors the Java Concentus Opus implementation from [lostromb/concentus](https://github.com/lostromb/concentus) commit `3885c4e46513ef0fc81fca100189e54f1714c6ca`, imported via DiPlay commit `24ae1fa52edbe27392a668d4c9e71a32d5691986`. The BSD-style license and copyright notices are retained in [LICENSE](../shared/src/main/java/org/concentus/LICENSE) and packaged as `assets/concentus-LICENSE.txt`. [Vendoring notes](../shared/src/main/java/org/concentus/README.md) and [source hashes](WM_EX5_OPUS_SOURCE.json) identify the source.

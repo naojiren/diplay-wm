@@ -1,0 +1,24 @@
+{
+  "apk": "DiPlay-WM-EX5-perf19-audio-armv7.apk",
+  "sha256": "349d21742c1b66329522145ec5d945459d9baa186db6f131cb23ba7593c6c552",
+  "bytes": 12746240,
+  "versionCode": 63,
+  "versionName": "0.2.17-legacy.1-wm-ex5-perf19-audio",
+  "applicationId": "com.shihab.diplay.wmex5",
+  "abis": [
+    "armeabi-v7a"
+  ],
+  "buildCompleted": true,
+  "fullValidationCompleted": false,
+  "remainingChecksSkippedAtOwnerRequest": true,
+  "physicalVoiceConfirmation": {
+    "source": "owner_report",
+    "date": "2026-10-12",
+    "vehicle": "WM EX5 2019",
+    "android": "6.0.1 / API 23",
+    "chatgptVoiceConversation": "passed",
+    "siriMapNavigationRecognition": "passed"
+  },
+  "legacyFirstAudioDelayStatisticMerged": false,
+  "legacyAutomaticSilentSourceFallbackMerged": false
+}

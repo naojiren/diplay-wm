@@ -774,6 +774,6 @@
     <string name="connection_stage_elapsed">Current stage · %1$d seconds</string>
     <string name="connection_stage_stalled">Waiting in this stage for %1$d seconds</string>
     <string name="settings_fps_24">24 fps</string>
-    <string name="settings_phone_microphone_only">Phone microphone only (experimental)</string>
+    <string name="settings_phone_microphone_only">Disable head-unit microphone (experimental)</string>
     <string name="settings_phone_microphone_only_description">Stops recording from the head unit and keeps audio playback unchanged. The iPhone selects the input device; select iPhone in its audio controls if available. If Siri cannot hear you, turn this off. Applies at the next connection.</string>
 </resources>

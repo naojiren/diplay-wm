@@ -42,6 +42,7 @@ class WmAuthenticationInstrumentation : Instrumentation() {
         try {
             if (perf13Video || perf14Wifi) {
                 optimizedDefaultsAreApplied()
+                softwareMicrophoneEncodingUsesAndroidSixApis()
                 if (perf14Wifi) interfaceBonjourUsesAndroidSixApis()
                 nativeVideoCrypto()
                 audioPlaybackUsesAndroidSixApis()
@@ -350,9 +351,48 @@ class WmAuthenticationInstrumentation : Instrumentation() {
         check(wmCluster("fps") == 18)
         check(AirPlayPersistence.loadWirelessHotspotMode(targetContext) == WirelessHotspotMode.WIFI_P2P)
         check(AirPlayPersistence.loadWifiP2pPreferredChannel(targetContext) == 44)
-        check(targetContext.getSharedPreferences("diplay_wm_ex5_performance", 0)
-            .getBoolean("phone_microphone_only", false))
-        status("PERF18 installed upgrade defaults passed: dual 18 fps, Wi-Fi Direct channel 44, phone microphone experiment")
+        check(!targetContext.getSharedPreferences("diplay_wm_ex5_performance", 0)
+            .getBoolean("phone_microphone_only", true))
+        status("PERF19 installed upgrade defaults passed: dual 18 fps, Wi-Fi Direct channel 44, head-unit microphone restored")
+    }
+
+    private fun softwareMicrophoneEncodingUsesAndroidSixApis() {
+        check(com.shilapi.xcertplay.media.OpusEncoderSupport.isAvailable()) {
+            "Neither platform nor software microphone encoding is usable"
+        }
+        // Exercise the encoder in the delivered target class loader, not a duplicate test copy.
+        val type = Class.forName("com.shilapi.xcertplay.media.SoftwareOpusEncoder", true, targetContext.classLoader)
+        val constructor = type.declaredConstructors.first { it.parameterTypes.size == 3 }
+        constructor.isAccessible = true
+        val callback: (String, Throwable) -> Unit = { message, error -> throw IllegalStateException(message, error) }
+        val encoder = constructor.newInstance(48_000, 5, callback)
+        val decodeType = Class.forName("org.concentus.OpusDecoder", true, targetContext.classLoader)
+        val decoder = decodeType.getConstructor(Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
+            .newInstance(48_000, 1)
+        val encode = type.getMethod("encode", ByteArray::class.java)
+        val decode = decodeType.getMethod("decode", ByteArray::class.java, Int::class.javaPrimitiveType,
+            Int::class.javaPrimitiveType, ShortArray::class.java, Int::class.javaPrimitiveType,
+            Int::class.javaPrimitiveType, Boolean::class.javaPrimitiveType)
+        try {
+            var frames = 0
+            val start = System.nanoTime()
+            repeat(12) { frameIndex ->
+                val pcm = ByteArray(1920)
+                for (index in 0 until 960) {
+                    val sample = (8_000 * kotlin.math.sin((frameIndex * 960 + index) * 2.0 * Math.PI * 440 / 48_000)).toInt()
+                    pcm[index * 2] = sample.toByte()
+                    pcm[index * 2 + 1] = (sample shr 8).toByte()
+                }
+                val packets = encode.invoke(encoder, pcm) as List<*>
+                check(packets.size == 1)
+                val packet = packets.single() as ByteArray
+                val restored = ShortArray(960)
+                check(decode.invoke(decoder, packet, 0, packet.size, restored, 0, restored.size, false) == 960)
+                if (restored.any { it != 0.toShort() }) frames++
+            }
+            check(frames >= 10) { "Software Opus decoded only silence" }
+            status("PERF19 software Opus 48kHz/mono/20ms round-trip PASS API=${Build.VERSION.SDK_INT} frames=12 elapsedMs=${(System.nanoTime()-start)/1_000_000}")
+        } finally { type.getMethod("close").invoke(encoder) }
     }
 
     private fun connectionButtonsWork() {

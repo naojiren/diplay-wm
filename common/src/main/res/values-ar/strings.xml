@@ -677,6 +677,6 @@
     <string name="connection_stage_elapsed">المرحلة الحالية · %1$d ثوانٍ</string>
     <string name="connection_stage_stalled">مدة الانتظار في هذه المرحلة: %1$d ثوانٍ</string>
     <string name="settings_fps_24">24 إطارًا/ثانية</string>
-    <string name="settings_phone_microphone_only">ميكروفون الهاتف فقط (تجريبي)</string>
+    <string name="settings_phone_microphone_only">إيقاف ميكروفون السيارة (تجريبي)</string>
     <string name="settings_phone_microphone_only_description">يوقف التسجيل من السيارة ويحافظ على تشغيل الصوت. يختار iPhone جهاز الإدخال؛ اختر iPhone في عناصر التحكم بالصوت إذا كان متاحًا. إذا لم تسمعك Siri، أوقف هذا الخيار. يسري عند الاتصال التالي.</string>
 </resources>

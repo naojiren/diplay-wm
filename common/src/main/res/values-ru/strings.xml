@@ -677,6 +677,6 @@
     <string name="connection_stage_elapsed">Текущий этап · %1$d сек.</string>
     <string name="connection_stage_stalled">Ожидание на этом этапе: %1$d сек.</string>
     <string name="settings_fps_24">24 кадра/с</string>
-    <string name="settings_phone_microphone_only">Только микрофон телефона (экспериментально)</string>
+    <string name="settings_phone_microphone_only">Отключить микрофон автомобиля (экспериментально)</string>
     <string name="settings_phone_microphone_only_description">Отключает запись в автомобиле, сохраняя воспроизведение. Вход выбирает iPhone; выберите iPhone в управлении звуком, если этот пункт доступен. Если Siri вас не слышит, отключите настройку. Применяется при следующем подключении.</string>
 </resources>

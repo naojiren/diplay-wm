@@ -53,7 +53,7 @@ class WmEx5OptimizedDefaultsTest {
         assertTrue(AirPlayPersistence.loadWirelessEnabled(wm))
         assertEquals(WirelessHotspotMode.WIFI_P2P, AirPlayPersistence.loadWirelessHotspotMode(wm))
         assertEquals(44, WmEx5PerformanceProfile.channel(wm))
-        assertTrue(WmEx5PerformanceProfile.phoneMicrophoneOnly(wm))
+        assertFalse(WmEx5PerformanceProfile.phoneMicrophoneOnly(wm))
         assertFalse(WmEx5PerformanceProfile.enabled(wm))
         assertEquals(mainBefore.filterKeys { it !in setOf("display_fps", "wireless_enabled", "wireless_hotspot_mode") },
             prefs("xcertplay_airplay").all.filterKeys { it !in setOf("display_fps", "wireless_enabled", "wireless_hotspot_mode") })
@@ -82,6 +82,31 @@ class WmEx5OptimizedDefaultsTest {
         WmEx5OptimizedDefaults.applyOnce(base)
         assertEquals(before, prefs("xcertplay_airplay").all)
         assertFalse(WmEx5PerformanceProfile.phoneMicrophoneOnly(base))
+    }
+
+    @Test fun perf18UpgradeRestoresCaptureWithoutResettingAnyOtherSetting() {
+        val profile = prefs("diplay_wm_ex5_performance")
+        profile.edit().putBoolean("perf18_defaults_applied", true)
+            .putBoolean("phone_microphone_only", true).putInt("wireless_channel", 6).commit()
+        AirPlayPersistence.saveFps(wm, 24)
+        AirPlayPersistence.saveWirelessHotspotMode(wm, WirelessHotspotMode.EXISTING_WIFI)
+        AirPlayPersistence.saveMediaAudioChannel(wm, 3)
+        WmEx5ClusterProfile.setFps(wm, 24)
+        WmEx5ClusterProfile.setMargin(wm, "left", 24)
+        WmEx5ClusterProfile.setMargin(wm, "bottom", 5)
+        val mainBefore = prefs("xcertplay_airplay").all.toMap()
+        val clusterBefore = prefs("diplay_wm_ex5_cluster").all.toMap()
+        val profileBefore = profile.all.filterKeys { it != "phone_microphone_only" }
+        WmEx5OptimizedDefaults.applyOnce(wm)
+        assertFalse(WmEx5PerformanceProfile.phoneMicrophoneOnly(wm))
+        assertEquals(mainBefore, prefs("xcertplay_airplay").all)
+        assertEquals(clusterBefore, prefs("diplay_wm_ex5_cluster").all)
+        assertEquals(profileBefore, profile.all.filterKeys {
+            it !in setOf("phone_microphone_only", "perf19_audio_defaults_applied")
+        })
+        WmEx5PerformanceProfile.savePhoneMicrophoneOnly(wm, true)
+        WmEx5OptimizedDefaults.applyOnce(wm)
+        assertTrue("later explicit driver choice survives", WmEx5PerformanceProfile.phoneMicrophoneOnly(wm))
     }
 
     @Test fun freshInstallCompletesHistoricalMigrationsBeforeApplyingNewDefaults() {
