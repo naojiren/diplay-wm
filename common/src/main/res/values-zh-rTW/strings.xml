@@ -255,6 +255,9 @@
     <string name="mfi_certificate_signing_target">MFi 憑證與簽署目標</string>
     <string name="model">型號</string>
     <string name="music_buffer">音樂快取</string>
+    <string name="settings_media_buffer_ms">%1$d 毫秒</string>
+    <string name="settings_media_buffer_default">%1$s · 預設</string>
+    <string name="settings_media_buffer_description">100／150 毫秒回應更快，但 Wi-Fi 不穩定時可能短暫斷音。較大的快取更連貫，也會增加延遲。變更在下次連接 CarPlay 時生效。</string>
     <string name="resolution_native">原生</string>
     <string name="navigation_on_hud_and_instrument_cluster">HUD 和儀表板導航</string>
     <string name="navigation_stream_type">導航音訊串流類型</string>

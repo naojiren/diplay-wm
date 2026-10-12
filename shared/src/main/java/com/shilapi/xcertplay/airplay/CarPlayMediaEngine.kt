@@ -181,6 +181,8 @@ class CarPlayMediaEngine(
         )
         val connectionId = stream["streamConnectionID"]
         val latencyMs = (stream["audioLatencyMs"] as? Number)?.toInt() ?: 0
+        session.logDebug("Audio SETUP type=$type audioType=$audioType codec=${format.codec} " +
+            "rate=${format.sampleRate} declaredAudioLatencyMs=$latencyMs")
         val meta = AudioMeta(type, format, connectionId, latencyMs)
         val microphone = microphoneConfig(session, type, stream, format)
         if (microphone != null) pendingMicrophone[streamKey] = microphone

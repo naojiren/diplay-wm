@@ -25,7 +25,7 @@ android {
         minSdk = 19
         targetSdk = 37
         multiDexEnabled = true
-        versionCode = 63
+        versionCode = 64
         versionName = "0.2.17-legacy.1"
         testInstrumentationRunner = "com.shilapi.xcertplay.WmAuthenticationInstrumentation"
         ndk {
@@ -56,7 +56,7 @@ android {
         debug {
             isDebuggable = false
             applicationIdSuffix = ".wmex5"
-            versionNameSuffix = "-wm-ex5-perf19-audio"
+            versionNameSuffix = "-wm-ex5-perf20-audio-latency"
         }
         release {
             optimization {

@@ -1464,10 +1464,18 @@ class DiPlayActivity : ComponentActivity() {
             mediaChannelControl(card)
             navigationChannelControl(card)
             val bufferPresets = com.shilapi.xcertplay.media.MediaAudioBuffer.presets
-            choice(card, getString(R.string.music_buffer), listOf(getString(R.string.s_300_ms_default), getString(R.string.s_500_ms), getString(R.string.s_1000_ms_most_stable)),
+            val bufferLabels = bufferPresets.map { millis ->
+                val label = getString(R.string.settings_media_buffer_ms, millis)
+                if (millis == AirPlayPersistence.defaultMediaBufferMillis(this)) {
+                    getString(R.string.settings_media_buffer_default, label)
+                } else label
+            }
+            choice(card, getString(R.string.music_buffer), bufferLabels,
                 bufferPresets.indexOf(AirPlayPersistence.loadMediaBufferMillis(this)).coerceAtLeast(0)) {
                 AirPlayPersistence.saveMediaBufferMillis(this, bufferPresets[it])
+                markReconnectNeeded()
             }
+            card.addView(label(getString(R.string.settings_media_buffer_description), 14, MUTED))
         }
         filteredSection(content, SettingsSection.LOCATION,
             getString(R.string.location), R.drawable.ic_dp_navigation) { card ->

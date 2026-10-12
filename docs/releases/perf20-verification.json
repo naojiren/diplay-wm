@@ -1,0 +1,82 @@
+{
+  "modules": {
+    "shared": {
+      "tests": 1158,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "common": {
+      "tests": 980,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "samples/home": {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "compat/jmdns": {
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "lint": {
+    "mobile": {
+      "warning": 22
+    },
+    "samples/home": {
+      "warning": 5
+    },
+    "samples/maphost": {
+      "warning": 2
+    }
+  },
+  "physicalAudioDelayMeasured": false,
+  "bytes": 12758073,
+  "sha256": "0f955f9c71fd5124180e64e948d72d3230ef4f5ad994d6ac3273b8be15bbb313",
+  "abis": [
+    "armeabi-v7a"
+  ],
+  "nativeLibraries": [
+    "lib/armeabi-v7a/libconscrypt_jni.so",
+    "lib/armeabi-v7a/liblegacy_ncm_claim.so",
+    "lib/armeabi-v7a/liblocal_hotspot_radio.so",
+    "lib/armeabi-v7a/libspeex_echo.so",
+    "lib/armeabi-v7a/libusb_host_compat.so",
+    "lib/armeabi-v7a/libxcertplay_i2c.so"
+  ],
+  "android6RuntimePassed": true,
+  "runtimeScope": [
+    "150 ms media AudioTrack write/play on API 23",
+    "300 ms media packet limit selected",
+    "preserved software Opus microphone round-trip"
+  ],
+  "runtimeTestUsedSameApplicationDex": true,
+  "apk": "DiPlay-WM-EX5-perf20-audio-latency-armv7.apk",
+  "versionCode": 64,
+  "versionName": "0.2.17-legacy.1-wm-ex5-perf20-audio-latency",
+  "applicationId": "com.shihab.diplay.wmex5",
+  "buildCompleted": true,
+  "fullValidationCompleted": true,
+  "date": "2026-10-13",
+  "sourceBranch": "wm-ex5-perf20-audio-latency",
+  "basedOn": "6cfcb264a8904dfffd9e24127e4282dc3dc762ef",
+  "physicalVoiceConfirmationForThisVersion": null,
+  "changes": [
+    "100/150 ms media presets; WM default 150 ms",
+    "one-time upgrade resets only music buffer to 150 ms",
+    "short media buffers also bound packet age and RTP span",
+    "speech and buffered TCP music retain original buffering policy",
+    "preserved perf19 microphone encoding and Android 6 voice routing",
+    "audio latency and queue diagnostics; feedback algorithm unchanged"
+  ],
+  "sameSigningCertificateAsPerf19": true,
+  "sameAuthenticationAssetsAsPerf19": true,
+  "signingCertificateSha256": "89a94fd5d7d32fdd26d81c3827c74bb3dc215af91d1fcff0661fd8e1d2c13509",
+  "installedOnVehicle": false
+}

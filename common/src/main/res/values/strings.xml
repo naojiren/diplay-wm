@@ -257,6 +257,9 @@
     <string name="mfi_certificate_signing_target">MFI certificate &amp; signing target</string>
     <string name="model">Model</string>
     <string name="music_buffer">Music buffer</string>
+    <string name="settings_media_buffer_ms">%1$d ms</string>
+    <string name="settings_media_buffer_default">%1$s · default</string>
+    <string name="settings_media_buffer_description">100/150 ms responds faster but may interrupt music on unstable Wi-Fi. A larger buffer improves continuity and adds delay. Changes apply at the next CarPlay connection.</string>
     <string name="resolution_native">Native</string>
     <string name="navigation_on_hud_and_instrument_cluster">Navigation on HUD and dashboard</string>
     <string name="navigation_stream_type">Navigation stream type</string>

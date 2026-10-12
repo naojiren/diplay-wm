@@ -255,6 +255,9 @@
     <string name="mfi_certificate_signing_target">Сертифікат MFi і ціль підписання</string>
     <string name="model">Модель</string>
     <string name="music_buffer">Буфер музики</string>
+    <string name="settings_media_buffer_ms">%1$d мс</string>
+    <string name="settings_media_buffer_default">%1$s · типово</string>
+    <string name="settings_media_buffer_description">100/150 мс прискорює відгук, але за нестабільного Wi-Fi музика може перериватися. Більший буфер покращує безперервність і збільшує затримку. Зміни діють під час наступного підключення CarPlay.</string>
     <string name="resolution_native">Рідна</string>
     <string name="navigation_on_hud_and_instrument_cluster">Навігація на HUD і приборці</string>
     <string name="navigation_stream_type">Тип аудіопотоку навігації</string>

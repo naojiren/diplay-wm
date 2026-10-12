@@ -523,8 +523,13 @@ object AirPlayPersistence {
 
     fun loadMediaBufferMillis(context: Context): Int = com.shilapi.xcertplay.media.MediaAudioBuffer.sanitize(
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getInt(KEY_MEDIA_BUFFER_MS, com.shilapi.xcertplay.media.MediaAudioBuffer.DEFAULT_MILLIS),
+            .getInt(KEY_MEDIA_BUFFER_MS, defaultMediaBufferMillis(context)),
     )
+
+    fun defaultMediaBufferMillis(context: Context): Int =
+        if (WmEx5PerformanceProfile.isTestPackage(context)) {
+            com.shilapi.xcertplay.media.MediaAudioBuffer.LOW_LATENCY_DEFAULT_MILLIS
+        } else com.shilapi.xcertplay.media.MediaAudioBuffer.DEFAULT_MILLIS
 
     /** CarPlay's buffered music (Apple Music sends ahead over TCP); off by default, applies at reconnect. */
     fun loadMainBufferedAudio(context: Context): Boolean =

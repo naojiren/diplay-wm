@@ -28,11 +28,13 @@ class WmAuthenticationInstrumentation : Instrumentation() {
     private var missingVpn = false
     private var perf13Video = false
     private var perf14Wifi = false
+    private var perf20Audio = false
     override fun onCreate(arguments: Bundle?) {
         super.onCreate(arguments)
         missingVpn = arguments?.getString("missing-vpn") == "true"
         perf13Video = arguments?.getString("perf13-video") == "true"
         perf14Wifi = arguments?.getString("perf14-wifi") == "true"
+        perf20Audio = arguments?.getString("perf20-audio") == "true"
         androidx.multidex.MultiDex.installInstrumentation(context, targetContext)
         start()
     }
@@ -40,6 +42,15 @@ class WmAuthenticationInstrumentation : Instrumentation() {
     override fun onStart() {
         var passed = 0
         try {
+            if (perf20Audio) {
+                check(AirPlayPersistence.loadMediaBufferMillis(targetContext) == 150)
+                softwareMicrophoneEncodingUsesAndroidSixApis()
+                lowLatencyAudioPlaybackUsesAndroidSixApis()
+                finish(Activity.RESULT_OK, Bundle().apply {
+                    putString("stream", "PERF20 short media buffer and preserved software Opus PASS API=${Build.VERSION.SDK_INT}\n")
+                })
+                return
+            }
             if (perf13Video || perf14Wifi) {
                 optimizedDefaultsAreApplied()
                 softwareMicrophoneEncodingUsesAndroidSixApis()
@@ -343,6 +354,32 @@ class WmAuthenticationInstrumentation : Instrumentation() {
             sink.onMediaAudioFocusChanged(android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
             sink.onMediaAudioFocusChanged(android.media.AudioManager.AUDIOFOCUS_GAIN)
             status("PERF18 AudioTrack playback passed with head-unit microphone capture disabled API=${Build.VERSION.SDK_INT}")
+        } finally { sink.onAudioStopped(id); sink.close() }
+    }
+
+    private fun lowLatencyAudioPlaybackUsesAndroidSixApis() {
+        val lines = Collections.synchronizedList(mutableListOf<String>())
+        val ready = CountDownLatch(1)
+        val playing = CountDownLatch(1)
+        val sink = AndroidMediaSink(context = targetContext, audioFocusEnabled = false, mediaBufferMillis = 150,
+            onAudioDiagnostic = { line ->
+                lines += line
+                if (line.startsWith("Audio: ready")) ready.countDown()
+                if (line.startsWith("Audio: first play") && line.contains("mediaBufferSettingMs=150 ") &&
+                    line.contains("queueLimitMs=300")) playing.countDown()
+            })
+        val id = AudioStreamId(100, "media")
+        val format = AudioFormat(AudioCodecKind.LPCM, 48000, 2, 96)
+        try {
+            sink.onAudioStarted(id, format, 0)
+            check(ready.await(5, TimeUnit.SECONDS)) { "Short AudioTrack initialization: $lines" }
+            repeat(18) { packet ->
+                sink.onAudioRtp(id, format, ByteArray(12 + 1920).apply { this[0] = 0x80.toByte() }, packet * 480)
+            }
+            check(playing.await(5, TimeUnit.SECONDS)) { "150 ms media did not start: $lines" }
+            check(lines.any { it.startsWith("Audio: first PCM write") })
+            check(lines.none { it.contains("renderer failed") })
+            status("PERF20 Android 6 media playback: 150 ms setting, 300 ms packet limit, PCM write/play passed")
         } finally { sink.onAudioStopped(id); sink.close() }
     }
 

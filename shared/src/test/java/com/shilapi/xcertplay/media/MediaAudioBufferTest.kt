@@ -1,9 +1,57 @@
 package com.shilapi.xcertplay.media
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class MediaAudioBufferTest {
+    @Test
+    fun `buffered TCP music keeps its original anchor and FIFO policy`() {
+        for (millis in listOf(100, 150, 300)) {
+            val actual = MediaAudioBuffer.playbackMillis(millis, bufferedStream = true)
+            assertEquals(300, actual)
+            assertNull(MediaAudioBuffer.queueLimitMillis(true, actual))
+            assertEquals(500L, MediaAudioBuffer.tailWaitMillis(true, actual))
+        }
+        for (millis in listOf(100, 150, 300, 500, 1000)) {
+            assertEquals(millis, MediaAudioBuffer.playbackMillis(millis, bufferedStream = false))
+        }
+        assertEquals(1000, MediaAudioBuffer.playbackMillis(1000, bufferedStream = true))
+    }
+
+    @Test
+    fun `short media presets reduce both start delay and track capacity`() {
+        val hundred = MediaAudioBuffer.plan(true, 48_000, 2, 7_680, 100)
+        assertEquals(19_200, hundred.startBytes)
+        assertEquals(28_800, hundred.trackBufferBytes)
+        val hundredFifty = MediaAudioBuffer.plan(true, 48_000, 2, 7_680, 150)
+        assertEquals(28_800, hundredFifty.startBytes)
+        assertEquals(38_400, hundredFifty.trackBufferBytes)
+        assertEquals(200, MediaAudioBuffer.queueLimitMillis(true, 100))
+        assertEquals(300, MediaAudioBuffer.queueLimitMillis(true, 150))
+        assertEquals(50L, MediaAudioBuffer.tailWaitMillis(true, 150))
+    }
+
+    @Test
+    fun `hardware minimum still bounds short media presets`() {
+        val plan = MediaAudioBuffer.plan(true, 48_000, 2, 32_768, 100)
+        assertEquals(32_768, plan.startBytes)
+        assertEquals(65_536, plan.trackBufferBytes)
+    }
+
+    @Test
+    fun `short media presets never trim speech and stable media retains FIFO`() {
+        assertNull(MediaAudioBuffer.queueLimitMillis(false, 100))
+        assertNull(MediaAudioBuffer.queueLimitMillis(false, 150))
+        for (millis in listOf(300, 500, 1000)) {
+            assertNull(MediaAudioBuffer.queueLimitMillis(true, millis))
+            assertEquals(500L, MediaAudioBuffer.tailWaitMillis(true, millis))
+        }
+        assertEquals(500L, MediaAudioBuffer.tailWaitMillis(false, 150))
+        assertEquals(MediaAudioBuffer.plan(false, 48_000, 1, 7_680, 1000),
+            MediaAudioBuffer.plan(false, 48_000, 1, 7_680, 100))
+    }
+
     @Test
     fun `music buffers the chosen delay plus headroom`() {
         // 48 kHz stereo 16-bit = 192 000 bytes/s.
