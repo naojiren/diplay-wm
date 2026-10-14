@@ -1,4 +1,4 @@
 <resources>
-    <string name="app_name">DiPlay 威马优化版</string>
-    <string name="wm_test_app_name" translatable="false">DiPlay 威马优化版</string>
+    <string name="app_name">WePlay</string>
+    <string name="wm_test_app_name" translatable="false">WePlay</string>
 </resources>

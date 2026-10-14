@@ -21,6 +21,7 @@ class Iap2LinkChannel private constructor(
     private val linkConfig: Iap2LinkConfig,
     private val initiateNegotiation: Boolean,
     private val onArtwork: (Iap2ArtworkTransfer) -> Unit,
+    private val onDiagnostic: (String) -> Unit,
 ) : AutoCloseable {
     private data class Command(val sessionId: Int, val payload: ByteArray)
 
@@ -29,7 +30,17 @@ class Iap2LinkChannel private constructor(
     private var commandBytes = 0
     private val controls = ArrayDeque<ByteArray>()
     private var controlBytes = 0
+    private var controlsConsumed = 0L
     private val fileTransfers = Iap2FileTransferReceiver()
+
+    // Worker-owned overflow slot: keep the exact next fragment, never drop/reorder CSM bytes.
+    private var pendingControl: ByteArray? = null
+    private var pressureStartedMillis: Long? = null
+    private var pressureProgressMillis = 0L
+    private var pressureConsumed = 0L
+    private var pressureInitialConsumed = 0L
+    private var pressureLogged = false
+    private var nextPressureLogMillis = 0L
 
     private var ready = false
     private var peerMaxControlPayloadBytes: Int? = null
@@ -103,6 +114,8 @@ class Iap2LinkChannel private constructor(
             if (controls.isEmpty()) return null
             val bytes = controls.removeFirst()
             controlBytes -= bytes.size
+            controlsConsumed += 1
+            lock.notifyAll()
             return bytes
         }
     }
@@ -145,6 +158,8 @@ class Iap2LinkChannel private constructor(
     private fun runPump() {
         val engine = Iap2LinkEngine(linkConfig)
         try {
+            var input: ByteArray? = null
+            var inputOffset = 0
             engine.start(wiredInitiator = initiateNegotiation, nowMillis = nowMillis())
             while (!isClosing()) {
                 drainCommands(engine)
@@ -152,6 +167,22 @@ class Iap2LinkChannel private constructor(
                 flush(engine)
                 if (!drainEvents(engine)) return
                 if (isClosing()) return
+
+                if (pendingControl != null) {
+                    // Stop accepting input, but keep commands, ACK/retransmission timers and
+                    // close responsive. Waiting inside drainEvents would freeze that work.
+                    awaitControlCapacity(engine)
+                    continue
+                }
+
+                val buffered = input
+                if (buffered != null) {
+                    val end = min(inputOffset + ENGINE_FEED_CHUNK_BYTES, buffered.size)
+                    engine.feed(buffered.copyOfRange(inputOffset, end), nowMillis())
+                    inputOffset = end
+                    if (end == buffered.size) input = null
+                    continue
+                }
 
                 val next = engine.nextDeadlineMillis()
                 val waitMillis = min(
@@ -163,7 +194,10 @@ class Iap2LinkChannel private constructor(
                 when {
                     received == null -> Unit
                     received.isEmpty() -> engine.feedEof()
-                    else -> engine.feed(received, nowMillis())
+                    else -> {
+                        input = received
+                        inputOffset = 0
+                    }
                 }
             }
             finish(null)
@@ -177,7 +211,8 @@ class Iap2LinkChannel private constructor(
     }
 
     private fun drainCommands(engine: Iap2LinkEngine) {
-        while (engine.writable()) {
+        var drained = 0
+        while (engine.writable() && drained++ < MAX_PENDING_COMMANDS) {
             val command = synchronized(lock) {
                 if (commands.isEmpty()) {
                     null
@@ -200,6 +235,12 @@ class Iap2LinkChannel private constructor(
 
     /** Returns false when a link terminal event has been observed. */
     private fun drainEvents(engine: Iap2LinkEngine): Boolean {
+        // A terminal engine event takes priority over a blocked fragment (die clears its events).
+        if (engine.state() == Iap2LinkEngine.State.DEAD) pendingControl = null
+        pendingControl?.let { bytes ->
+            if (!enqueueControl(bytes)) return true
+            pendingControl = null
+        }
         while (true) {
             when (val event = engine.pollEvent() ?: return true) {
                 is Iap2LinkEngine.Event.Writable -> synchronized(lock) {
@@ -212,21 +253,9 @@ class Iap2LinkChannel private constructor(
                 }
 
                 is Iap2LinkEngine.Event.Control -> {
-                    val overflow = synchronized(lock) {
-                        if (controls.size >= MAX_PENDING_CONTROLS ||
-                            event.bytes.size > MAX_PENDING_CONTROL_BYTES - controlBytes
-                        ) {
-                            true
-                        } else {
-                            controls += event.bytes
-                            controlBytes += event.bytes.size
-                            lock.notifyAll()
-                            false
-                        }
-                    }
-                    if (overflow) {
-                        finish(IOException("iAP2 received-control queue limit exceeded"))
-                        return false
+                    if (!enqueueControl(event.bytes)) {
+                        pendingControl = event.bytes
+                        return true
                     }
                 }
 
@@ -250,6 +279,81 @@ class Iap2LinkChannel private constructor(
                     return false
                 }
             }
+        }
+    }
+
+    private fun enqueueControl(bytes: ByteArray): Boolean {
+        var diagnostic: String? = null
+        val accepted = synchronized(lock) {
+            if (closing || terminated) return false
+            val now = nowMillis()
+            if (hasControlCapacityLocked(bytes.size)) {
+                controls += bytes
+                controlBytes += bytes.size
+                pressureStartedMillis?.let { started ->
+                    if (pressureLogged) {
+                        diagnostic = "iAP2 control backpressure resumed waitedMs=${now - started} " +
+                            "queued=${controls.size} bytes=$controlBytes consumed=${controlsConsumed - pressureInitialConsumed}"
+                    }
+                    pressureStartedMillis = null
+                    pressureLogged = false
+                }
+                lock.notifyAll()
+                true
+            } else {
+                if (pressureStartedMillis == null) {
+                    pressureStartedMillis = now
+                    pressureProgressMillis = now
+                    pressureConsumed = controlsConsumed
+                    pressureInitialConsumed = controlsConsumed
+                    pressureLogged = now >= nextPressureLogMillis
+                    if (pressureLogged) {
+                        nextPressureLogMillis = now + PRESSURE_LOG_INTERVAL_MILLIS
+                        diagnostic = "iAP2 control backpressure started queued=${controls.size} " +
+                            "bytes=$controlBytes pendingBytes=${bytes.size}"
+                    }
+                } else if (controlsConsumed != pressureConsumed) {
+                    // Only actual receive progress resets the stall budget, not send/notify activity.
+                    pressureConsumed = controlsConsumed
+                    pressureProgressMillis = now
+                }
+                if (now - pressureProgressMillis >= CONTROL_STALL_TIMEOUT_MILLIS) {
+                    throw IOException(
+                        "iAP2 control consumer stalled for ${now - pressureProgressMillis}ms " +
+                            "queued=${controls.size} bytes=$controlBytes pendingBytes=${bytes.size}",
+                    )
+                }
+                false
+            }
+        }
+        diagnostic?.let(::emitDiagnostic)
+        return accepted
+    }
+
+    private fun awaitControlCapacity(engine: Iap2LinkEngine) {
+        val bytes = pendingControl ?: return
+        val now = nowMillis()
+        val timeout = min(
+            RECEIVE_POLL_MILLIS,
+            engine.nextDeadlineMillis()?.let { (it - now).coerceAtLeast(0) } ?: RECEIVE_POLL_MILLIS,
+        ).coerceAtLeast(MINIMUM_RECEIVE_POLL_MILLIS)
+        synchronized(lock) {
+            waitFor(timeout) {
+                closing || terminated || hasControlCapacityLocked(bytes.size) ||
+                    (commands.isNotEmpty() && engine.writable())
+            }
+        }
+    }
+
+    /** lock must already be held. The pending slot and engine input are separately bounded. */
+    private fun hasControlCapacityLocked(bytes: Int): Boolean =
+        controls.size < MAX_PENDING_CONTROLS && bytes <= MAX_PENDING_CONTROL_BYTES - controlBytes
+
+    private fun emitDiagnostic(message: String) {
+        try {
+            onDiagnostic(message)
+        } catch (_: Exception) {
+            // Logging must never break the control link.
         }
     }
 
@@ -348,6 +452,9 @@ class Iap2LinkChannel private constructor(
 
     companion object {
         private const val RECEIVE_CHUNK_BYTES = 8_192
+        // A single feed can produce <=103 tiny wire packets plus <=64 out-of-order packets;
+        // drain those before feeding again, below the engine's 256-event bound.
+        private const val ENGINE_FEED_CHUNK_BYTES = 1_024
         private const val RECEIVE_POLL_MILLIS = 100L
         private const val MINIMUM_RECEIVE_POLL_MILLIS = 1L
         private const val CLOSE_JOIN_MILLIS = 1_000L
@@ -357,6 +464,8 @@ class Iap2LinkChannel private constructor(
         private const val MAX_PENDING_COMMAND_BYTES = 1_048_576
         private const val MAX_PENDING_CONTROLS = 64
         private const val MAX_PENDING_CONTROL_BYTES = 1_048_576
+        private const val CONTROL_STALL_TIMEOUT_MILLIS = 15_000L
+        private const val PRESSURE_LOG_INTERVAL_MILLIS = 5_000L
 
         private val WIRED_LINK_CONFIG = Iap2LinkConfig(
             maxOutgoing = 4,
@@ -372,8 +481,9 @@ class Iap2LinkChannel private constructor(
         fun open(
             underlying: BlockingDuplexByteStream,
             onArtwork: (Iap2ArtworkTransfer) -> Unit = {},
+            onDiagnostic: (String) -> Unit = {},
         ): Iap2LinkChannel =
-            Iap2LinkChannel(underlying, WIRED_LINK_CONFIG, initiateNegotiation = true, onArtwork)
+            Iap2LinkChannel(underlying, WIRED_LINK_CONFIG, initiateNegotiation = true, onArtwork, onDiagnostic)
                 .also { it.worker.start() }
 
         /**
@@ -383,8 +493,9 @@ class Iap2LinkChannel private constructor(
         fun openWireless(
             underlying: BlockingDuplexByteStream,
             onArtwork: (Iap2ArtworkTransfer) -> Unit = {},
+            onDiagnostic: (String) -> Unit = {},
         ): Iap2LinkChannel =
-            Iap2LinkChannel(underlying, WIRELESS_LINK_CONFIG, initiateNegotiation = false, onArtwork)
+            Iap2LinkChannel(underlying, WIRELESS_LINK_CONFIG, initiateNegotiation = false, onArtwork, onDiagnostic)
                 .also { it.worker.start() }
 
         /**
@@ -394,8 +505,9 @@ class Iap2LinkChannel private constructor(
         fun openTunnel(
             underlying: BlockingDuplexByteStream,
             onArtwork: (Iap2ArtworkTransfer) -> Unit = {},
+            onDiagnostic: (String) -> Unit = {},
         ): Iap2LinkChannel =
-            Iap2LinkChannel(underlying, WIRED_LINK_CONFIG, initiateNegotiation = true, onArtwork)
+            Iap2LinkChannel(underlying, WIRED_LINK_CONFIG, initiateNegotiation = true, onArtwork, onDiagnostic)
                 .also { it.worker.start() }
 
         private fun nowMillis(): Long = System.nanoTime() / NANOS_PER_MILLISECOND

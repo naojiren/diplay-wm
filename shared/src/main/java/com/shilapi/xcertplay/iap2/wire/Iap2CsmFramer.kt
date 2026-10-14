@@ -23,31 +23,49 @@ class Iap2CsmFramer {
         var offset = 0
         while (offset < chunk.size) {
             drain(frames)
-            val count = minOf(chunk.size - offset, receive.remainingCapacity())
-            check(count > 0) { "CSM receive buffer could not make progress" }
-            receive.append(chunk, offset, count)
-            offset += count
+            offset += append(chunk, offset)
         }
         drain(frames)
         return frames
     }
 
-    private fun drain(frames: MutableList<Iap2Frame>) {
+    /**
+     * Copies as much of [chunk] as fits, returning the consumed byte count. Incremental consumers
+     * call [poll] before appending again and retain only the unread part of their current transport
+     * payload. A large batch then needs neither an eagerly decoded list nor a second frame queue.
+     */
+    internal fun append(chunk: ByteArray, offset: Int = 0): Int {
+        require(offset in 0..chunk.size)
+        if (offset == chunk.size) return 0
+        val count = minOf(chunk.size - offset, receive.remainingCapacity())
+        check(count > 0) { "CSM receive buffer could not make progress" }
+        receive.append(chunk, offset, count)
+        return count
+    }
+
+    /** Returns at most one complete frame; other bytes remain bounded by [MAX_FRAME_BYTES]. */
+    internal fun poll(): Iap2Frame? {
         while (true) {
             while (receive.size >= 2 && !receive.hasStart()) receive.discard(1)
-            if (receive.size < HEADER_BYTES) return
+            if (receive.size < HEADER_BYTES) return null
 
             val length = receive.u16(2)
             if (length < HEADER_BYTES) {
                 receive.discard(1)
                 continue
             }
-            if (receive.size < length) return
+            if (receive.size < length) return null
 
             val messageId = receive.u16(4)
             val payload = receive.copyOfRange(HEADER_BYTES, length)
             receive.discard(length)
-            frames += Iap2Frame(messageId, payload)
+            return Iap2Frame(messageId, payload)
+        }
+    }
+
+    private fun drain(frames: MutableList<Iap2Frame>) {
+        while (true) {
+            frames += poll() ?: return
         }
     }
 

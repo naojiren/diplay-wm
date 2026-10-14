@@ -16,13 +16,17 @@ import com.shilapi.xcertplay.transport.Iap2ArtworkTransfer
  *
  * [Iap2CsmChannel] remains the lower-level frame transport. This class is the protocol-facing
  * facade used by services: it accepts endpoint builders, sends complete frames, receives complete
- * frames, and exposes the typed body reader.
+ * frames, and exposes the typed body reader. Factories default to lifecycle/failure diagnostics;
+ * detailedFrameTracing explicitly opts into expensive per-packet dumps for development.
  */
 class Iap2Session private constructor(
     private val channel: Iap2CsmChannel,
     private val traceContext: String,
-    private val onTrace: (String) -> Unit,
+    onTrace: (String) -> Unit,
+    detailedFrameTracing: Boolean,
 ) : AutoCloseable {
+    private val trace = Iap2SessionTrace(traceContext, onTrace, detailedFrameTracing)
+
     val isClosed: Boolean get() = channel.isClosed
 
     fun awaitReady(timeoutMillis: Long): Boolean {
@@ -91,26 +95,11 @@ class Iap2Session private constructor(
     }
 
     private fun emitFrameTrace(direction: Iap2TraceDirection, frame: Iap2Frame) {
-        try {
-            emitTrace(Iap2FrameFormatter.format(direction, traceContext, frame))
-        } catch (failure: Exception) {
-            emitTrace(
-                Iap2FrameFormatter.formatFailure(
-                    direction,
-                    traceContext,
-                    frame.messageId,
-                    failure,
-                ),
-            )
-        }
+        trace.frame(direction, frame)
     }
 
     private fun emitTrace(message: String) {
-        try {
-            onTrace(message)
-        } catch (_: Exception) {
-            // Logging must never change protocol behavior.
-        }
+        trace.emit(message)
     }
 
     companion object {
@@ -121,29 +110,77 @@ class Iap2Session private constructor(
             traceContext: String = "wired",
             onTrace: (String) -> Unit = {},
             onArtwork: (Iap2ArtworkTransfer) -> Unit = {},
+            detailedFrameTracing: Boolean = false,
         ): Iap2Session =
-            Iap2Session(Iap2CsmChannel.open(underlying, onArtwork), traceContext, onTrace)
+            Iap2Session(
+                Iap2CsmChannel.open(underlying, onArtwork, onDiagnostic = onTrace),
+                traceContext,
+                onTrace,
+                detailedFrameTracing,
+            )
 
         fun openWireless(
             underlying: BlockingDuplexByteStream,
             traceContext: String = "wireless",
             onTrace: (String) -> Unit = {},
             onArtwork: (Iap2ArtworkTransfer) -> Unit = {},
+            detailedFrameTracing: Boolean = false,
         ): Iap2Session =
-            Iap2Session(Iap2CsmChannel.openWireless(underlying, onArtwork), traceContext, onTrace)
+            Iap2Session(
+                Iap2CsmChannel.openWireless(underlying, onArtwork, onDiagnostic = onTrace),
+                traceContext,
+                onTrace,
+                detailedFrameTracing,
+            )
 
         fun openTunnel(
             underlying: BlockingDuplexByteStream,
             traceContext: String = "wireless-tunnel",
             onTrace: (String) -> Unit = {},
             onArtwork: (Iap2ArtworkTransfer) -> Unit = {},
+            detailedFrameTracing: Boolean = false,
         ): Iap2Session =
-            Iap2Session(Iap2CsmChannel.openTunnel(underlying, onArtwork), traceContext, onTrace)
+            Iap2Session(
+                Iap2CsmChannel.openTunnel(underlying, onArtwork, onDiagnostic = onTrace),
+                traceContext,
+                onTrace,
+                detailedFrameTracing,
+            )
 
         fun wrap(
             channel: Iap2CsmChannel,
             traceContext: String = "iap2",
             onTrace: (String) -> Unit = {},
-        ): Iap2Session = Iap2Session(channel, traceContext, onTrace)
+            detailedFrameTracing: Boolean = false,
+        ): Iap2Session = Iap2Session(channel, traceContext, onTrace, detailedFrameTracing)
+    }
+}
+
+/**
+ * Successful packet dumps are opt-in: parsing TLVs, copying payloads and formatting hex on the
+ * control consumer delays draining its bounded receive queue on older head units. Gate that work
+ * here, before formatting, while always preserving lifecycle and failure diagnostics.
+ */
+internal class Iap2SessionTrace(
+    private val context: String,
+    private val onTrace: (String) -> Unit,
+    private val detailedFrameTracing: Boolean = false,
+    private val formatFrame: (Iap2TraceDirection, String, Iap2Frame) -> String = Iap2FrameFormatter::format,
+) {
+    fun frame(direction: Iap2TraceDirection, frame: Iap2Frame) {
+        if (!detailedFrameTracing) return
+        try {
+            emit(formatFrame(direction, context, frame))
+        } catch (failure: Exception) {
+            emit(Iap2FrameFormatter.formatFailure(direction, context, frame.messageId, failure))
+        }
+    }
+
+    fun emit(message: String) {
+        try {
+            onTrace(message)
+        } catch (_: Exception) {
+            // Logging must never change protocol behavior.
+        }
     }
 }

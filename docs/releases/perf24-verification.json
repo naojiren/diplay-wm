@@ -1,0 +1,121 @@
+{
+  "modules": {
+    "shared": {
+      "tests": 1173,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "common": {
+      "tests": 982,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "samples/home": {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "compat/jmdns": {
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "lint": {
+    "mobile": {
+      "warning": 22
+    },
+    "samples/home": {
+      "warning": 5
+    },
+    "samples/maphost": {
+      "warning": 2
+    }
+  },
+  "installedOnVehicle": true,
+  "physicalAudioDelayMeasured": false,
+  "bytes": 12830709,
+  "sha256": "49e61689573bf0c03e6114fe4e70a805633af654d3e83271bd4fc81378b6c31a",
+  "abis": [
+    "armeabi-v7a"
+  ],
+  "nativeLibraries": [
+    "lib/armeabi-v7a/libconscrypt_jni.so",
+    "lib/armeabi-v7a/liblegacy_ncm_claim.so",
+    "lib/armeabi-v7a/liblocal_hotspot_radio.so",
+    "lib/armeabi-v7a/libspeex_echo.so",
+    "lib/armeabi-v7a/libusb_host_compat.so",
+    "lib/armeabi-v7a/libxcertplay_i2c.so"
+  ],
+  "apk": "WePlay-WM-EX5-perf24-armv7.apk",
+  "versionCode": 68,
+  "versionName": "0.2.17-legacy.1-wm-ex5-perf24-control",
+  "applicationId": "com.shihab.diplay.wmex5",
+  "buildCompleted": true,
+  "fullValidationCompleted": true,
+  "date": "2026-10-14",
+  "sourceBranch": "wm-ex5-perf24-control-backpressure",
+  "audioImplementationRestoredFrom": "6cfcb264a8904dfffd9e24127e4282dc3dc762ef",
+  "baseVersion": "0.2.17-legacy.1-wm-ex5-perf23-weplay",
+  "changes": [
+    "Bounded iAP2 receive backpressure through the AirPlay input stream",
+    "Incremental link event and CSM parsing for valid bursts",
+    "Default-off detailed frame formatting; retained error and pressure diagnostics",
+    "Preserved perf23 audio/microphone/300ms buffer, dual display, settings, WePlay label and icon 5"
+  ],
+  "launcherIconCornersTransparent": true,
+  "launcherIconDensityVariantsValidated": true,
+  "manifestUsesNewAppIcon": true,
+  "physicalAudioContinuityTestPassed": null,
+  "githubUploaded": false,
+  "sameSigningCertificateAsPerf19": true,
+  "sameAuthenticationAssetsAsPerf19": true,
+  "signingCertificateSha256": "89a94fd5d7d32fdd26d81c3827c74bb3dc215af91d1fcff0661fd8e1d2c13509",
+  "controlRegressionSuites": {
+    "Iap2LinkChannelBackpressureTest": {
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "Iap2CsmChannelTest": {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "Iap2CsmFramerIncrementalTest": {
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "Iap2SessionTraceTest": {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "IapTunnelReceiveBufferTest": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "AirPlayIapTunnelStreamTest": {
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "sourceManifestSha256": "7200ab018ea82d9f6dec0f1442068f7a0e4022edb5a5435c13d36e70bcd0c7b7",
+  "longVehicleStabilityTestPassed": null,
+  "installedVersionConfirmed": true,
+  "vehicleInstallResult": "Success",
+  "vehicleLastUpdateTime": "2026-10-14 00:33:40 Asia/Shanghai"
+}

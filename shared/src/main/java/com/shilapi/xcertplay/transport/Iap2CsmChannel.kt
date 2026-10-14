@@ -3,7 +3,6 @@ package com.shilapi.xcertplay.transport
 import com.shilapi.xcertplay.iap2.wire.Iap2CsmFramer
 import com.shilapi.xcertplay.iap2.wire.Iap2Frame
 import java.io.IOException
-import java.util.ArrayDeque
 import kotlin.math.min
 
 /**
@@ -21,8 +20,10 @@ class Iap2CsmChannel private constructor(
     private val sendLock = Object()
     private val receiveLock = Object()
     private val framer = Iap2CsmFramer()
-    private val receivedFrames = ArrayDeque<Iap2Frame>()
-    private var receivedBytes = 0
+    // Keep only one unread link payload, not an eager list of decoded frames. Together with the
+    // framer's 65,535-byte buffer this stays below 128 KiB, even for thousands of tiny CSM frames.
+    private var pendingControl: ByteArray? = null
+    private var pendingOffset = 0
     private var closed = false
     private var terminalFailure: Throwable? = null
 
@@ -87,36 +88,54 @@ class Iap2CsmChannel private constructor(
 
     /**
      * Returns the next complete CSM frame, null on timeout or clean close, and throws on failure.
-     * A single underlying control payload can decode into several frames; the remainder stays in a
-     * bounded queue for later calls.
+     * A single underlying control payload can contain many frames. Decode them on demand, retaining
+     * the remainder as bounded raw bytes instead of failing when a valid burst exceeds 64 frames.
      */
     fun recv(timeoutMillis: Long): Iap2Frame? {
         requireTimeout(timeoutMillis)
         synchronized(receiveLock) {
-            takeReceived()?.let { return it }
             val deadlineNanos = deadlineAfter(timeoutMillis)
+            var readPayload = false
             while (true) {
                 try {
-                    checkOpen()
+                    synchronized(stateLock) {
+                        terminalFailure?.let { throw it }
+                        if (closed) return null
+                    }
                 } catch (failure: Error) {
                     fatal(failure)
                 }
-                val control = try {
-                    link.recvControl(remainingMillis(deadlineNanos))
-                } catch (failure: Throwable) {
-                    if (failure is Error) fatal(failure)
-                    failClosed(failure)
-                } ?: return null
-
-                val frames = try {
-                    framer.offer(control)
+                val frame = try {
+                    framer.poll()
                 } catch (failure: Throwable) {
                     if (failure is Error) fatal(failure)
                     failClosed(IOException("Invalid CSM control payload", failure))
                 }
-                for (frame in frames) enqueue(frame)
-                takeReceived()?.let { return it }
-                if (remainingMillis(deadlineNanos) == 0L) return null
+                if (frame != null) return frame
+
+                if (pendingControl == null) {
+                    if (readPayload && remainingMillis(deadlineNanos) == 0L) return null
+                    pendingControl = try {
+                        link.recvControl(remainingMillis(deadlineNanos))
+                    } catch (failure: Throwable) {
+                        if (failure is Error) fatal(failure)
+                        failClosed(failure)
+                    } ?: return null
+                    pendingOffset = 0
+                    readPayload = true
+                }
+                val control = pendingControl!!
+                try {
+                    pendingOffset += framer.append(control, pendingOffset)
+                } catch (failure: Throwable) {
+                    if (failure is Error) fatal(failure)
+                    failClosed(IOException("Invalid CSM control payload", failure))
+                }
+                if (pendingOffset == control.size) {
+                    pendingControl = null
+                    pendingOffset = 0
+                }
+                // Loop back to poll the bytes just appended, even for a zero-timeout receive.
             }
         }
     }
@@ -139,21 +158,6 @@ class Iap2CsmChannel private constructor(
             }
             throw terminalize(failure)
         }
-    }
-
-    private fun enqueue(frame: Iap2Frame) {
-        val encodedBytes = frame.encodedFrame().size
-        if (receivedFrames.size >= MAX_PENDING_FRAMES || encodedBytes > MAX_PENDING_FRAME_BYTES - receivedBytes) {
-            failClosed(IOException("CSM received-frame queue limit exceeded"))
-        }
-        receivedFrames += frame
-        receivedBytes += encodedBytes
-    }
-
-    private fun takeReceived(): Iap2Frame? {
-        val frame = receivedFrames.pollFirst() ?: return null
-        receivedBytes -= frame.encodedFrame().size
-        return frame
     }
 
     private fun checkOpen() {
@@ -215,8 +219,6 @@ class Iap2CsmChannel private constructor(
     }
 
     companion object {
-        private const val MAX_PENDING_FRAMES = 64
-        private const val MAX_PENDING_FRAME_BYTES = 1_048_576
         private const val NANOS_PER_MILLISECOND = 1_000_000L
         private const val MAX_TIMEOUT_MILLIS = 5 * 60 * 1_000L
         private const val DEFAULT_SEND_TIMEOUT_MILLIS = 5_000L
@@ -225,21 +227,24 @@ class Iap2CsmChannel private constructor(
         fun open(
             underlying: BlockingDuplexByteStream,
             onArtwork: (Iap2ArtworkTransfer) -> Unit = {},
+            onDiagnostic: (String) -> Unit = {},
         ): Iap2CsmChannel =
-            Iap2CsmChannel(Iap2LinkChannel.open(underlying, onArtwork))
+            Iap2CsmChannel(Iap2LinkChannel.open(underlying, onArtwork, onDiagnostic))
 
         /** Opens the owned iAP2 link over an owned wireless RFCOMM stream. */
         fun openWireless(
             underlying: BlockingDuplexByteStream,
             onArtwork: (Iap2ArtworkTransfer) -> Unit = {},
+            onDiagnostic: (String) -> Unit = {},
         ): Iap2CsmChannel =
-            Iap2CsmChannel(Iap2LinkChannel.openWireless(underlying, onArtwork))
+            Iap2CsmChannel(Iap2LinkChannel.openWireless(underlying, onArtwork, onDiagnostic))
 
         /** Opens the owned iAP2 link over an AirPlay type-130 tunnel. */
         fun openTunnel(
             underlying: BlockingDuplexByteStream,
             onArtwork: (Iap2ArtworkTransfer) -> Unit = {},
+            onDiagnostic: (String) -> Unit = {},
         ): Iap2CsmChannel =
-            Iap2CsmChannel(Iap2LinkChannel.openTunnel(underlying, onArtwork))
+            Iap2CsmChannel(Iap2LinkChannel.openTunnel(underlying, onArtwork, onDiagnostic))
     }
 }

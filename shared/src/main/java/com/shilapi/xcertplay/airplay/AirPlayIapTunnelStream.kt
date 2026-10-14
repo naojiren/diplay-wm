@@ -2,8 +2,6 @@ package com.shilapi.xcertplay.airplay
 
 import com.shilapi.xcertplay.transport.BlockingDuplexByteStream
 import java.io.IOException
-import java.util.ArrayDeque
-import kotlin.math.min
 
 /**
  * Full-duplex adapter for the CarPlay iAP2 DataStream.
@@ -18,12 +16,7 @@ internal class AirPlayIapTunnelStream(
         session.sendIapMessage(data, timeoutMillis)
     },
 ) : BlockingDuplexByteStream {
-    private val lock = Object()
-    private val pending = ArrayDeque<ByteArray>()
-    private var pendingBytes = 0
-    private var closed = false
-    private var terminalFailure: Throwable? = null
-    private var closeLocation: String? = null
+    private val inbound = IapTunnelReceiveBuffer()
 
     fun listen(): Int = tunnel.listen(
         object : IapTunnel.Listener {
@@ -45,104 +38,40 @@ internal class AirPlayIapTunnelStream(
                         "${cause?.javaClass?.simpleName ?: "peer EOF"}: " +
                         "${cause?.message ?: "no detail"}",
                 )
-                val shouldCloseSession = markFailed(cause)
+                val shouldCloseSession = inbound.fail(cause)
                 if (shouldCloseSession) session.close()
             }
         },
     )
 
     override fun send(data: ByteArray) {
-        synchronized(lock) {
-            throwTerminalFailureLocked()
-            if (closed) throw closedFailureLocked()
-        }
+        inbound.checkOpen()
         if (!tunnel.awaitPeerConnection(PEER_CONNECT_TIMEOUT_MILLIS)) {
             throw IOException("CarPlay iAP tunnel peer did not connect")
         }
-        synchronized(lock) {
-            throwTerminalFailureLocked()
-            if (closed) throw closedFailureLocked()
-        }
+        inbound.checkOpen()
         if (!sendCommand(data, EVENT_READY_TIMEOUT_MILLIS)) {
             throw IOException("AirPlay event channel rejected an iAP message")
         }
     }
 
-    override fun recv(maxBytes: Int, timeoutMillis: Long): ByteArray? {
-        require(maxBytes > 0) { "maxBytes must be positive" }
-        require(timeoutMillis >= 0) { "timeoutMillis must not be negative" }
-
-        val deadlineNanos = System.nanoTime() + timeoutMillis * NANOS_PER_MILLISECOND
-        synchronized(lock) {
-            while (true) {
-                takePendingLocked(maxBytes)?.let { return it }
-                throwTerminalFailureLocked()
-                if (closed) return EMPTY
-                val remainingNanos = deadlineNanos - System.nanoTime()
-                if (remainingNanos <= 0) return null
-                try {
-                    lock.wait(
-                        remainingNanos / NANOS_PER_MILLISECOND,
-                        (remainingNanos % NANOS_PER_MILLISECOND).toInt(),
-                    )
-                } catch (_: InterruptedException) {
-                    Thread.currentThread().interrupt()
-                    return null
-                }
-            }
-        }
-    }
+    override fun recv(maxBytes: Int, timeoutMillis: Long): ByteArray? = inbound.recv(maxBytes, timeoutMillis)
 
     override fun close() {
-        synchronized(lock) {
-            if (closed) return
-            closed = true
-            closeLocation = closeCaller()
-            lock.notifyAll()
-        }
+        if (!inbound.close(closeCaller())) return
         tunnel.close()
     }
 
     private fun offer(bytes: ByteArray) {
-        if (bytes.isEmpty()) return
-        synchronized(lock) {
-            if (closed || terminalFailure != null) return
-            if (pendingBytes + bytes.size > MAX_PENDING_BYTES) {
-                terminalFailure = IOException("AirPlay iAP tunnel pending-data limit exceeded")
-                lock.notifyAll()
-                tunnel.close()
-                return
-            }
-            pending.addLast(bytes.copyOf())
-            pendingBytes += bytes.size
-            lock.notifyAll()
+        try {
+            inbound.offer(bytes)
+        } catch (failure: IOException) {
+            // A timed-out or interrupted writer has a terminal failure visible to the link reader.
+            // Stop the socket producer as well, rather than accepting more packages after it.
+            tunnel.close()
+            throw failure
         }
     }
-
-    private fun markFailed(cause: Throwable?): Boolean {
-        synchronized(lock) {
-            if (closed || terminalFailure != null) return false
-            terminalFailure = cause ?: IOException("AirPlay iAP tunnel terminated")
-            lock.notifyAll()
-            return true
-        }
-    }
-
-    private fun throwTerminalFailureLocked() {
-        val failure = terminalFailure ?: return
-        throw IOException(
-            "AirPlay iAP tunnel failed: " +
-                "${failure.javaClass.simpleName}: ${failure.message ?: "unknown error"}",
-            failure,
-        )
-    }
-
-    private fun closedFailureLocked(): IOException = IOException(
-        buildString {
-            append("AirPlay iAP tunnel is closed")
-            closeLocation?.let { append("; requested by $it") }
-        },
-    )
 
     private fun closeCaller(): String =
         Thread.currentThread().stackTrace
@@ -152,23 +81,8 @@ internal class AirPlayIapTunnelStream(
                 "${frame.className.substringAfterLast('.')}.${frame.methodName}:${frame.lineNumber}"
             }
 
-    private fun takePendingLocked(maxBytes: Int): ByteArray? {
-        val chunk = pending.pollFirst() ?: return null
-        pendingBytes -= chunk.size
-        if (chunk.size <= maxBytes) return chunk
-
-        val head = chunk.copyOf(maxBytes)
-        val tail = chunk.copyOfRange(maxBytes, chunk.size)
-        pending.addFirst(tail)
-        pendingBytes += tail.size
-        return head
-    }
-
     private companion object {
-        const val MAX_PENDING_BYTES = 1_048_576
         const val PEER_CONNECT_TIMEOUT_MILLIS = 15_000L
         const val EVENT_READY_TIMEOUT_MILLIS = 10_000L
-        const val NANOS_PER_MILLISECOND = 1_000_000L
-        val EMPTY = ByteArray(0)
     }
 }
