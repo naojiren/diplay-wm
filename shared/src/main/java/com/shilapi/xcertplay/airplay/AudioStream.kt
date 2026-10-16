@@ -8,6 +8,7 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import com.shilapi.xcertplay.media.AudioThreadPriority
 
 enum class AudioCodecKind { AAC_LC, OPUS, LPCM }
 
@@ -85,6 +86,8 @@ class AudioStream(
     }
 
     private fun runData(socket: DatagramSocket, listener: Listener) {
+        val priority = AudioThreadPriority.apply()
+        runCatching { onDiagnostic("Audio UDP worker type=$streamType priority=${priority ?: "unavailable"}") }
         val stats = StreamReceiveStats("audio type=$streamType", onDiagnostic)
         val buffer = ByteArray(DATAGRAM_BYTES)
         try {

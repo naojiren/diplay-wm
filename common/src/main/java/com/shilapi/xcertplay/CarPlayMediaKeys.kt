@@ -67,6 +67,7 @@ internal object CarPlayMediaKeys {
     private var artwork: Bitmap? = null
     private val artworkCache = LinkedHashMap<Int, Bitmap?>()
     private var placeholder: Bitmap? = null
+    private val wmKeyPresses = WmEx5MediaKeyPresses()
 
     @Synchronized
     fun attach(context: Context, next: CarPlayController) {
@@ -251,6 +252,7 @@ internal object CarPlayMediaKeys {
     }
 
     private fun releaseLocked() {
+        wmKeyPresses.clear()
         focusOwner = null
         artworkOwner = null
         artworkQueue.clear()
@@ -313,8 +315,24 @@ internal object CarPlayMediaKeys {
 
     private val callback = CarPlayMediaCallback(
         experimentalDiLink3Keys = { appContext?.let(BydOutputSettings::carPlayCallControls) == true },
+        hardwareEvent = { handleWmHardwareKey(it, releaseOnly = false) },
         send = ::send,
     )
+
+    /** Called only by the foreground WM host's OEM listener, never by the Android focus path. */
+    fun onWmFactoryKey(event: KeyEvent): Boolean = handleWmHardwareKey(event, releaseOnly = true)
+
+    /** Window delivery and MediaSession delivery share the same physical-press history. */
+    fun onWmWindowKey(event: KeyEvent): Boolean = handleWmHardwareKey(event, releaseOnly = false)
+
+    private fun handleWmHardwareKey(event: KeyEvent, releaseOnly: Boolean): Boolean {
+        val context = synchronized(this) { appContext } ?: return false
+        if (!WmEx5MediaKeys.supported(context) || !WmEx5MediaKeys.handles(event)) return false
+        wmKeyPresses.accept(event, releaseOnly)?.let {
+            send(it, if (releaseOnly) "WM factory ${event.keyCode}" else "WM Android ${event.keyCode}")
+        }
+        return true
+    }
 
     /** Whether [next] changes what the media session's metadata shows; position and play state do not. */
     internal fun metadataChanged(previous: CarPlayNowPlaying, next: CarPlayNowPlaying): Boolean =
@@ -409,11 +427,13 @@ internal object CarPlayMediaKeys {
  */
 internal class CarPlayMediaCallback(
     private val experimentalDiLink3Keys: () -> Boolean = { false },
+    private val hardwareEvent: (KeyEvent) -> Boolean = { false },
     private val send: (index: Int, source: String) -> Unit,
 ) : MediaSession.Callback() {
     override fun onMediaButtonEvent(mediaButtonIntent: Intent): Boolean {
         @Suppress("DEPRECATION")
         val event = mediaButtonIntent.getParcelableExtra<KeyEvent>(Intent.EXTRA_KEY_EVENT) ?: return false
+        if (hardwareEvent(event)) return true
         val index = CarPlayMediaButton.forKeyCode(event.keyCode, experimentalDiLink3Keys())
             ?: return super.onMediaButtonEvent(mediaButtonIntent)
         if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {

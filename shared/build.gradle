@@ -46,6 +46,29 @@ android {
         coreLibraryDesugaringEnabled true
     }
 }
+
+// Small ARMv7 helper for this Android 6 head unit. Kept as an asset, never loaded as JNI.
+// It uses the existing su only during a wireless lease and restores the radio snapshot.
+def wmNetworkAssets = layout.buildDirectory.dir('generated/wmNetworkGuardAssets')
+def wmNdkDirectory = androidComponents.sdkComponents.ndkDirectory
+def wmNetworkCompilerHost = System.getProperty('os.name').toLowerCase().contains('windows')
+        ? 'windows-x86_64' : (System.getProperty('os.name').toLowerCase().contains('mac') ? 'darwin-x86_64' : 'linux-x86_64')
+def buildWmNetworkGuard = tasks.register('buildWmNetworkGuard', Exec) {
+    inputs.files('src/main/jni/wm_network_guard.c', 'src/main/jni/wm_network_guard_policy.h')
+    outputs.file(wmNetworkAssets.map { it.file('wm-network-guard-armv7') })
+    doFirst {
+        def output = wmNetworkAssets.get().file('wm-network-guard-armv7').asFile
+        output.parentFile.mkdirs()
+        def compiler = new File(wmNdkDirectory.get().asFile,
+                "toolchains/llvm/prebuilt/${wmNetworkCompilerHost}/bin/armv7a-linux-androideabi23-clang" +
+                        (wmNetworkCompilerHost.startsWith('windows') ? '.cmd' : ''))
+        commandLine compiler, '-std=c11', '-Wall', '-Wextra', '-Werror', '-O2', '-fPIE', '-pie',
+                file('src/main/jni/wm_network_guard.c'), '-o', output
+    }
+}
+android.sourceSets.main.assets.srcDir(wmNetworkAssets.get().asFile)
+tasks.named('preBuild').configure { dependsOn(buildWmNetworkGuard) }
+
 dependencies {
     coreLibraryDesugaring libs.desugar.jdk.libs
     implementation 'androidx.annotation:annotation:1.7.1'

@@ -4,13 +4,13 @@
 
 A DiPlay Legacy Android variant adapted for a 2019 WM Motor EX5 head unit running Android 6.0.1. It supports the center display and instrument-cluster map, with existing audio, USB, wireless and low-latency changes preserved.
 
-[Download the latest APK](https://github.com/naojiren/diplay-wm/releases/latest) · [Releases](https://github.com/naojiren/diplay-wm/releases) · [Issues](https://github.com/naojiren/diplay-wm/issues)
+[Download the perf30 test APK](https://github.com/naojiren/diplay-wm/releases/tag/v0.2.17-wm-perf30-key-repeat) · [Releases](https://github.com/naojiren/diplay-wm/releases) · [Issues](https://github.com/naojiren/diplay-wm/issues)
 
-Install on the head unit, not the iPhone. The current release is **WePlay perf24 ARMv7 control-queue disconnect fix**, version code **68**, package **com.shihab.diplay.wmex5**, with the owner's selected icon 5.
+Install on the head unit, not the iPhone. The current source and test APK are **WePlay perf30 ARMv7**, version code **74**, package **com.shihab.diplay.wmex5**, with the owner's selected icon 5.
 
-It adds bounded receive backpressure throughout the iAP2 input path, incremental event/CSM decoding and default-off detailed packet formatting. Audio, microphone and dual-display behavior use the working older branch, with a 300ms default audio buffer.
+Perf30 fixes wheel media keys that could respond once and then remain blocked when the head unit reuses event timestamps. It retains perf29's foreground picture refresh and the perf28 audio and wireless changes that the owner found free of audio stutter.
 
-[Download perf24](https://github.com/naojiren/diplay-wm/releases/tag/v0.2.17-wm-perf24-control) · [Release notes and validation](docs/WM_EX5_PERF24.md). The APK was installed on the vehicle; 2,162 tests and the full CI command passed. Long-duration vehicle stability remains unverified.
+[Download perf30](https://github.com/naojiren/diplay-wm/releases/tag/v0.2.17-wm-perf30-key-repeat) · [Release notes and validation](docs/WM_EX5_PERF30.md). The full CI command and 2,196 tests passed. Perf30 has not yet been installed or verified on the vehicle; this is a prerelease.
 
 ## Defaults and features
 
@@ -20,13 +20,13 @@ It adds bounded receive backpressure throughout the iAP2 input path, incremental
 - Bluetooth is enabled when the app opens. Connection on open defaults to off. Optional boot launch and connection on open are available under Settings → Connection → Automatic connection. Select Wireless as the default connection mode and Wi-Fi Direct in connection setup. Cold-boot behavior depends on the head unit's BOOT_COMPLETED delivery; suspend/resume requires separate verification.
 - Head-unit microphone capture is restored. A bundled software Opus encoder is used when the system encoder is unavailable, and Siri playback uses a compatible audio usage on Android 6. The renamed Disable head-unit microphone experiment is off by default; enabling it cannot force the iPhone microphone and may prevent voice input.
 
-Updating earlier WM packages signed with the same key preserves pairing, display and network settings. Self-built APKs may use a different signing key. The existing car-marker vertical setting can be changed to Down 10% (about 46 pixels at the current cluster height); it applies after reconnection and is not a new default baked into perf24.
+Updating earlier WM packages signed with the same key preserves pairing, display and network settings. Self-built APKs may use a different signing key. The existing car-marker vertical setting can be changed to Down 10% (about 46 pixels at the current cluster height); it applies after reconnection and is not a new default baked into perf30.
 
 ## Compatibility and validation
 
-Minimum SDK 19 (Android 4.4); the primary physical target is the 2019 EX5 / Android 6.0.1 / TI DRA74x with a 32-bit ARMv7 system. The perf24 APK includes only ARMv7 and is about 12.83 MB. Removing unused architectures reduces download and storage size; it does not itself reduce video latency. Other head units remain unverified.
+Minimum SDK 19 (Android 4.4); the primary physical target is the 2019 EX5 / Android 6.0.1 / TI DRA74x with a 32-bit ARMv7 system. The perf30 APK includes only ARMv7 and is about 12.85 MB. Removing unused architectures reduces download and storage size; it does not itself reduce video latency. Other head units remain unverified.
 
-The published APK matches the vehicle-installed file. The full CI command passed: 2,162 unit tests, zero lint errors, including bounded control bursts and an encrypted 4MB tunnel package. Long-duration vehicle stability remains to be tested. See [perf24 details](docs/WM_EX5_PERF24.md).
+The perf30 APK matches the validated build artifact. The full CI command passed: 2,196 unit tests and zero lint errors, including wheel-key timestamp reuse and duplicate event coverage. Vehicle testing of perf30 is pending. See [perf30 details](docs/WM_EX5_PERF30.md).
 
 USB depends on firmware driver compatibility and the Android VPN authorization component. Wi-Fi Direct can disconnect the head unit from ordinary Wi-Fi. For Same LAN, connect both devices to the same router; if setup stalls, reconnect the iPhone's Wi-Fi.
 

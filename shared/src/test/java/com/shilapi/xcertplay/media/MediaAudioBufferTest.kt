@@ -4,6 +4,20 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class MediaAudioBufferTest {
+    @Test fun legacyGuidanceGetsBurstHeadroomWithoutChangingMusicOrCalls() {
+        val guidance = MediaAudioBuffer.plan(AudioChannel.NAVIGATION, 23, 48_000, 1, 8_200, 300)
+        assertEquals(19_200, guidance.startBytes)
+        assertEquals(38_400, guidance.trackBufferBytes)
+        val phone = MediaAudioBuffer.plan(AudioChannel.PHONE, 23, 48_000, 1, 8_200, 300)
+        val siri = MediaAudioBuffer.plan(AudioChannel.ASSISTANT, 23, 48_000, 1, 8_200, 300)
+        assertEquals(8_200, phone.startBytes)
+        assertEquals(phone, siri)
+        assertEquals(phone, MediaAudioBuffer.plan(AudioChannel.NAVIGATION, 24, 48_000, 1, 8_200, 300))
+        val media = MediaAudioBuffer.plan(AudioChannel.MEDIA, 23, 48_000, 2, 8_200, 300)
+        assertEquals(57_600, media.startBytes)
+        assertEquals(96_000, media.trackBufferBytes)
+    }
+
     @Test
     fun `music buffers the chosen delay plus headroom`() {
         // 48 kHz stereo 16-bit = 192 000 bytes/s.

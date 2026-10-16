@@ -4,15 +4,15 @@
 
 为 **2019 款威马 EX5、Android 6.0.1 车机**适配的 CarPlay 接收端，支持中控画面和仪表地图。基于 [DiPlay Legacy Android](https://github.com/programmerguohuajing/DiPlay-Legacy-Android)，保留旧 Android 兼容与威马双屏、音频、USB、无线和低延迟优化。
 
-**下载安装到车机，不是 iPhone。** [下载最新安装包](https://github.com/naojiren/diplay-wm/releases/latest) · [全部版本](https://github.com/naojiren/diplay-wm/releases) · [问题反馈](https://github.com/naojiren/diplay-wm/issues)
+**下载安装到车机，不是 iPhone。** [下载 perf30 测试包](https://github.com/naojiren/diplay-wm/releases/tag/v0.2.17-wm-perf30-key-repeat) · [已发布版本](https://github.com/naojiren/diplay-wm/releases) · [问题反馈](https://github.com/naojiren/diplay-wm/issues)
 
 ## 当前版本
 
-`perf24` · 版本号 `68` · 应用名 **WePlay** · 包名 `com.shihab.diplay.wmex5`。
+`perf30` · 版本号 `74` · 应用名 **WePlay** · 包名 `com.shihab.diplay.wmex5`。
 
-最新包为 **WePlay perf24 ARMv7 控制队列断线修复版**，采用车主选定的图标 5。针对导航、听歌期间的 iAP2 控制队列溢出，增加上下游有界等待与增量消息解析，并减少逐帧日志开销。沿用声音正常版本的音频、麦克风、双屏适配和 300ms 默认音频缓冲。
+当前源码和测试包为 **WePlay perf30 ARMv7**。它修复车机实体左右切歌和中间播放暂停键可能只响应一次的问题，保留 perf29 的返回前台画面刷新，以及此前实车确认声音不卡的 perf28 音频和无线处理。沿用车主选定的图标 5。
 
-[下载 perf24 APK](https://github.com/naojiren/diplay-wm/releases/tag/v0.2.17-wm-perf24-control) · [修复和验证范围](docs/WM_EX5_PERF24.md)。已安装到实车；2162 项测试通过、静态检查零错误，长时实车稳定性仍待验证。
+[下载 perf30 APK](https://github.com/naojiren/diplay-wm/releases/tag/v0.2.17-wm-perf30-key-repeat) · [按键修复记录](docs/WM_EX5_PERF30.md)。2196 项测试通过、静态检查零错误；perf30 尚未实车安装和验证，作为预发布版提供。
 
 | 项目 | 默认设置 / 支持情况 |
 |---|---|
@@ -26,11 +26,11 @@
 | 音频 | 沿用语音输入/输出切换修复；默认音乐缓冲 300ms；兼容 Android 6 Siri 输出 |
 | 启动 | 打开应用自动开启蓝牙；打开时连接默认关闭，可自行设置开机启动与连接 |
 
-覆盖升级保留已有配对、布局、帧率、无线模式与信道设置。仪表“车辆标记 · 垂直 → 下 10%”是可选用户设置（当前高度下约 46 像素），重新连接后生效；它没有固化为 perf24 默认值。
+覆盖升级保留已有配对、布局、帧率、无线模式与信道设置。仪表“车辆标记 · 垂直 → 下 10%”是可选用户设置（当前高度下约 46 像素），重新连接后生效；它没有固化为 perf30 默认值。
 
 ## 安装和连接
 
-1. 从最新 Release 下载 `WePlay-WM-EX5-perf24-armv7.apk`，安装到车机。
+1. 从 perf30 预发布版下载 `WePlay-perf30-armv7.apk`，安装到车机。
 2. 从本项目此前威马包升级且签名相同时，可直接覆盖安装并保留设置。自行编译的签名可能不同；遇到签名冲突时先核对来源，卸载会清除设置。
 3. 保持 iPhone 的蓝牙和 Wi-Fi 开启，完成车机蓝牙配对，在 DiPlay 中选择手机并允许 CarPlay。
 4. Wi-Fi Direct 会按兼容处理断开车机已有的普通 Wi-Fi。使用同局域网时，让手机和车机连接同一路由器；若长时间没有画面，尝试让手机关闭再开启 Wi-Fi 并重新连接。
@@ -49,8 +49,8 @@
 ## 兼容和验证
 
 - 源码最低 Android 4.4 / API 19；主要实车验证目标为威马 EX5 2019、Android 6.0.1 / API 23、TI DRA74x/Jacinto6。其他车型、固件和 Android 版本仍需自行验证。
-- perf24 APK 仅包含 ARMv7，约 12.83 MB；发布文件与实车安装文件一致。声音处理沿用此前已确认可用的旧版分支。
-- perf24 完整 CI 命令通过，2162 项单元测试通过，静态检查零错误；包括控制队列压力恢复与真实加密隧道大包验证。实车长时间断线复测结果尚未确认。详见 [本版记录](docs/WM_EX5_PERF24.md) 与 [历史语音修复记录](docs/WM_EX5_PERF19.md)。
+- perf30 APK 仅包含 ARMv7，约 12.85 MB；音频与无线保护沿用 perf28。perf30 尚未实车安装和验证。
+- perf30 完整 CI 命令通过，2196 项单元测试通过，静态检查零错误；包含重复时间戳、全零时间戳与跨通道按键去重测试。详见 [本版记录](docs/WM_EX5_PERF30.md) 与 [历史语音修复记录](docs/WM_EX5_PERF19.md)。
 - 视频使用 Android MediaCodec；实车此前已确认 TI H.264 硬件解码。低帧率不一定更低延迟：旧硬解的持帧等待可能在低帧率下更加明显。
 
 ## 源码构建

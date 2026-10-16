@@ -130,6 +130,14 @@ class CarPlayHostActivity : ComponentActivity() {
     private val siriKey = WheelSiriKey()
     private val siriKeyPresses = WheelKeyPresses()
     private val legacySiriPresses = mutableSetOf<Triple<Int, Int, Int>>()
+    private val wmMediaKeys = WmEx5MediaKeysMonitor(
+        supported = { WmEx5MediaKeys.supported(this) },
+        onKey = { event ->
+            if (!menuOpen && !shuttingDown.get() && activeAirPlaySession != null) {
+                CarPlayMediaKeys.onWmFactoryKey(event)
+            }
+        },
+    )
     private val startupRetryBudget = WirelessStartupRetryBudget()
     private var startupRetryStopped = false
     private var startupRetryButton: View? = null
@@ -280,6 +288,7 @@ class CarPlayHostActivity : ComponentActivity() {
     // Smooth video (a setting): SurfaceView output with frames released at the iPhone's frame time.
     private var smoothVideo = false
     private var lowLatencyVideo = false
+    private var pictureRefreshOnForeground = false
     // Sinks whose sessions are being torn down; their decoders may still render to the current surface
     // until they have released their codecs, so a destroyed surface is detached from them too. A restart
     // and a shutdown can overlap, so this is a set.
@@ -510,6 +519,7 @@ class CarPlayHostActivity : ComponentActivity() {
             }
             appendLog(if (existing === surface) "Texture surface reused" else "Texture surface created")
             attachSurface(surface)
+            if (lowLatencyVideo) sink?.refreshPicture(SCREEN_TYPE_MAIN)
             updateVideoLayout(width, height)
             scheduleDisplaySize(width, height)
         }
@@ -538,7 +548,7 @@ class CarPlayHostActivity : ComponentActivity() {
             appendLog("SurfaceView video surface created valid=${surface.isValid}")
             attachSurface(surface)
             // A still CarPlay screen sends no frames, so ask for one instead of showing the parked gap.
-            if (smoothVideo) sink?.refreshPicture(SCREEN_TYPE_MAIN)
+            if (smoothVideo || lowLatencyVideo) sink?.refreshPicture(SCREEN_TYPE_MAIN)
             videoView?.let { updateVideoLayout(it.width, it.height) }
         }
 
@@ -825,6 +835,7 @@ class CarPlayHostActivity : ComponentActivity() {
         super.onStart()
         WmEx5Startup.enableBluetooth(this)
         isActivityStarted = true
+        wmMediaKeys.start()
         logThemeState(ThemeModeDiagnostics.Source.START, resources.configuration)
         mainHandler.removeCallbacks(pollConfiguration)
         mainHandler.post(pollConfiguration)
@@ -835,6 +846,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        wmMediaKeys.start()
         val savedNightMode = AirPlayPersistence.loadCarPlayNightMode(this)
         val savedThreshold = AirPlayPersistence.loadAmbientLightThreshold(this)
         val savedDelay = AirPlayPersistence.loadAmbientDelaySeconds(this)
@@ -1172,6 +1184,8 @@ class CarPlayHostActivity : ComponentActivity() {
 
     // Hardware navigation belongs to the iPhone-rendered CarPlay UI, not Android View focus.
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (!menuOpen && activeAirPlaySession != null && !shuttingDown.get() &&
+            CarPlayMediaKeys.onWmWindowKey(event)) return true
         val physicalKey = Triple(event.deviceId, event.keyCode, event.scanCode)
         val downOrUp = event.action == KeyEvent.ACTION_DOWN || event.action == KeyEvent.ACTION_UP
         if (downOrUp && physicalKey in legacySiriPresses) {
@@ -1239,6 +1253,18 @@ class CarPlayHostActivity : ComponentActivity() {
         if (hasFocus) {
             refreshConfiguration(source = ThemeModeDiagnostics.Source.WINDOW_FOCUS)
             applyFullscreenMode()
+            // Some launchers retain the surface while hiding the window. Request a fresh image
+            // after layout as well as on surface creation; a static iPhone UI sends no new frames.
+            if (pictureRefreshOnForeground && lowLatencyVideo) {
+                videoView?.post {
+                    if (isActivityStarted && hasWindowFocus() && currentSurface?.isValid == true) {
+                        pictureRefreshOnForeground = false
+                        sink?.refreshPicture(SCREEN_TYPE_MAIN)
+                        videoView?.invalidate()
+                        appendLog("WM foreground picture refresh requested")
+                    }
+                }
+            }
         }
     }
 
@@ -1253,6 +1279,8 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     override fun onStop() {
+        wmMediaKeys.stop()
+        pictureRefreshOnForeground = true
         closePicturePanel()
         // The controller, USB/iAP2 link, and VPN attachment intentionally outlive the UI.
         isActivityStarted = false
@@ -1343,6 +1371,7 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        wmMediaKeys.stop()
         resetSidePanel()
         nightModeController.pause()
         pictureBinding?.close()

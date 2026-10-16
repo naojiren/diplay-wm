@@ -28,11 +28,13 @@ class WmAuthenticationInstrumentation : Instrumentation() {
     private var missingVpn = false
     private var perf13Video = false
     private var perf14Wifi = false
+    private var perf28Radio = false
     override fun onCreate(arguments: Bundle?) {
         super.onCreate(arguments)
         missingVpn = arguments?.getString("missing-vpn") == "true"
         perf13Video = arguments?.getString("perf13-video") == "true"
         perf14Wifi = arguments?.getString("perf14-wifi") == "true"
+        perf28Radio = arguments?.getString("perf28-radio") == "true"
         androidx.multidex.MultiDex.installInstrumentation(context, targetContext)
         start()
     }
@@ -40,6 +42,11 @@ class WmAuthenticationInstrumentation : Instrumentation() {
     override fun onStart() {
         var passed = 0
         try {
+            if (perf28Radio) {
+                radioGuardUsesRealAppPermissions()
+                finish(Activity.RESULT_OK, Bundle().apply { putString("stream", "PERF28 real-app local ADB radio activation and restoration PASS\n") })
+                return
+            }
             if (perf13Video || perf14Wifi) {
                 optimizedDefaultsAreApplied()
                 softwareMicrophoneEncodingUsesAndroidSixApis()
@@ -74,6 +81,27 @@ class WmAuthenticationInstrumentation : Instrumentation() {
                 putString("stream", "WM runtime FAILED passed=$passed\n${android.util.Log.getStackTraceString(error)}")
             })
         }
+    }
+
+    private fun radioGuardUsesRealAppPermissions() {
+        val lines = Collections.synchronizedList(mutableListOf<String>())
+        val callback: (String) -> Unit = { lines.add(it) }
+        val type = Class.forName("com.shilapi.xcertplay.network.WmWifiPerformanceGuard")
+        val guard = type.constructors.single().newInstance(targetContext, callback)
+        try {
+            type.getMethod("start").invoke(guard)
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(18)
+            while (System.nanoTime() < deadline && synchronized(lines) { lines.none { it.contains("verified=true") } }) Thread.sleep(100)
+            check(synchronized(lines) { lines.any { it.contains("verified=true") } }) { lines.toString() }
+            // Keep the session alive through multiple app heartbeat/native watchdog checks.
+            Thread.sleep(4500)
+        } finally {
+            type.getMethod("close").invoke(guard)
+        }
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+        while (System.nanoTime() < deadline && synchronized(lines) { lines.none { it.contains("restored=true") } }) Thread.sleep(100)
+        check(synchronized(lines) { lines.any { it.contains("restored=true") } }) { lines.toString() }
+        status(lines.joinToString("\n"))
     }
 
     private fun main(action: () -> Unit) {

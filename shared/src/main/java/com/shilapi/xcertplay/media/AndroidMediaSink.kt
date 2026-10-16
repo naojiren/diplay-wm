@@ -1355,6 +1355,11 @@ private class AudioRenderer(
     @Volatile private var started = false
     private var codec: MediaCodec? = null
     private var track: AudioTrack? = null
+    private val decoderInputRetry = AudioDecoderInputRetry(
+        dequeue = { timeout -> codec?.dequeueInputBuffer(timeout) ?: -1 },
+        drainOutput = { codec?.let(::drainCodec) },
+        running = { running },
+    )
     private var pcm = ByteArray(64 * 1024)
     private var playbackStarted = false
     private var prebufferBytes = 0
@@ -1388,7 +1393,6 @@ private class AudioRenderer(
     private var statsLastUnderruns = 0
     private var bytesPerSecond = 0
     private val bufferProgress = AudioBufferProgress(if (format.channels >= 2) 4 else 2)
-    private var underrunsAtPlaybackStart = 0
     private var lastPcmWriteNs = 0L
     private var rebufferCount = 0
     private var diagnosticStage = "starting"
@@ -1426,7 +1430,8 @@ private class AudioRenderer(
 
     private fun run() {
         try {
-            runCatching { report("Audio: starting api=${Build.VERSION.SDK_INT} " +
+            val priority = AudioThreadPriority.apply()
+            runCatching { report("Audio: starting api=${Build.VERSION.SDK_INT} priority=${priority ?: "unavailable"} " +
                 "audioType=${format.audioType} codec=${format.codec} rate=${format.sampleRate} channels=${format.channels} " +
                 "mapping=${if (advancedAudioChannelMapping) "automotive" else "mobile"} " +
                 "mediaChannel=$mediaChannel navigationChannel=$navigationChannel focus=$audioFocusEnabled") }
@@ -1529,7 +1534,7 @@ private class AudioRenderer(
         val streamOverride = channelOverride(selection.channel)
         var attributes = audioAttributesFor(selection, streamOverride)
         trackAttributes = attributes
-        val plan = MediaAudioBuffer.plan(selection.channel == AudioChannel.MEDIA,
+        val plan = MediaAudioBuffer.plan(selection.channel, Build.VERSION.SDK_INT,
             format.sampleRate, format.channels, minBuffer, mediaBufferMillis)
         bytesPerSecond = format.sampleRate * frameBytes
         val built: AudioTrack
@@ -1796,16 +1801,11 @@ private class AudioRenderer(
     private fun feedCodec(payload: ByteArray, presentationTimeUs: Long) {
         val codec = codec ?: run { decoderUnavailablePackets++; return }
         diagnosticStage = "decoder-input"
-        val index = codec.dequeueInputBuffer(INPUT_TIMEOUT_US)
+        val index = decoderInputRetry.acquire() ?: return
         if (index < 0) {
             inputDropped++
-            if (inputDropped == 1) {
-                Log.w(
-                    TAG,
-                    "audio decoder input unavailable codec=${format.codec} " +
-                        "queued=$inputQueued dropped=$inputDropped",
-                )
-            }
+            runCatching { report("Audio: decoder input stalled audioType=${format.audioType} " +
+                "codec=${format.codec} timeouts=${decoderInputRetry.timeouts} dropped=$inputDropped") }
             return
         }
         @Suppress("DEPRECATION")
@@ -1961,15 +1961,16 @@ private class AudioRenderer(
 
     private fun startPlayback(track: AudioTrack) {
         diagnosticStage = "track-play"
-        underrunsAtPlaybackStart = track.compatUnderruns()
         track.play()
         playbackStarted = true
+        bufferProgress.playbackStarted()
     }
 
     private fun maintainPlaybackBuffer() {
         val track = track ?: return
-        if (bufferProgress.shouldRebuffer(mappedChannel == AudioChannel.MEDIA, playbackStarted,
-                track.compatUnderruns() > underrunsAtPlaybackStart, queue.isEmpty(), track.playbackHeadPosition)) {
+        val bufferGuidance = Build.VERSION.SDK_INT <= 23 && mappedChannel == AudioChannel.NAVIGATION
+        if (bufferProgress.drainedForRebuffer(mappedChannel == AudioChannel.MEDIA || bufferGuidance,
+                playbackStarted, queue.isEmpty(), track.playbackHeadPosition, System.nanoTime())) {
             // The hardware buffer has actually drained. Pause without flushing or discarding PCM,
             // then use the configured start threshold again when music resumes.
             track.pause()
@@ -1978,8 +1979,9 @@ private class AudioRenderer(
             rebufferCount++
         }
         // A short final burst may never reach the start threshold. Play it after a bounded wait.
+        val tailWaitNs = if (bufferGuidance) GUIDANCE_TAIL_WAIT_NS else BUFFER_TAIL_WAIT_NS
         if (!playbackStarted && prebufferBytes > 0 && queue.isEmpty() &&
-            System.nanoTime() - lastPcmWriteNs >= BUFFER_TAIL_WAIT_NS) {
+            System.nanoTime() - lastPcmWriteNs >= tailWaitNs) {
             startPlayback(track)
         }
     }
@@ -2000,13 +2002,16 @@ private class AudioRenderer(
             previous?.let { (current - it) and 0xffff_ffffL }
         }
         val queuedFrames = playbackHeadFrames?.let { (totalWrittenFrames - it).coerceAtLeast(0L) }
+        val underrunSummary = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            "+${underruns - statsLastUnderruns}"
+        } else "unavailable"
         val line = "audio stats audioType=${format.audioType} channel=$mappedChannel " +
             "routeType=${currentTrack?.routedDevice?.type ?: -1} codec=${format.codec} " +
             "trackState=${currentTrack?.state ?: -1} playState=${currentTrack?.playState ?: -1} " +
             "sampleRate=${currentTrack?.sampleRate ?: format.sampleRate} " +
             "trackBufferFrames=${currentTrack?.bufferSizeInFrames ?: -1} " +
             "rx=${packetsReceived.getAndSet(0)} " +
-            "dropped=${packetsDropped.getAndSet(0)} underruns=+${underruns - statsLastUnderruns} queue=${queue.size} " +
+            "dropped=${packetsDropped.getAndSet(0)} underruns=$underrunSummary queue=${queue.size} " +
             "playing=$playbackStarted maxGapMs=${maxArrivalGapMs.getAndSet(0)} " +
             "sinceRxMs=${if (lastRx == 0L) -1 else (now - lastRx) / 1_000_000L} maxWriteMs=$maxWriteMs " +
             "writtenFrames=$writtenFramesThisWindow totalWrittenFrames=$totalWrittenFrames " +
@@ -2022,7 +2027,8 @@ private class AudioRenderer(
             val decoderLine = "Audio: decoder stats audioType=${format.audioType} codec=${format.codec} " +
                 "inputQueuedTotal=$inputQueued inputDroppedTotal=$inputDropped " +
                 "shortOpusPacketsTotal=$shortOpusPackets decoderUnavailablePacketsTotal=$decoderUnavailablePackets " +
-                "outputBuffersTotal=$outputBuffers ended=$force"
+                "outputBuffersTotal=$outputBuffers inputRetriesTotal=${decoderInputRetry.retries} " +
+                "inputTimeoutsTotal=${decoderInputRetry.timeouts} rebuffers=$rebufferCount ended=$force"
             Log.i(STATS_TAG, decoderLine)
             runCatching { report(decoderLine) }
         }
@@ -2110,9 +2116,9 @@ private class AudioRenderer(
         const val MIN_OPUS_PACKET_BYTES = 4
         const val OPUS_CODEC_DELAY_NANOS = 6_500_000L
         const val OPUS_SEEK_PRE_ROLL_NANOS = 80_000_000L
-        const val INPUT_TIMEOUT_US = 10_000L
         const val AUDIO_POLL_MILLIS = 10L
         const val BUFFER_TAIL_WAIT_NS = 500_000_000L
+        const val GUIDANCE_TAIL_WAIT_NS = 120_000_000L
         // Holds a burst after a Wi-Fi gap (~4 s of AAC) instead of dropping it.
         const val MAX_QUEUED_PACKETS = 192
         const val PREBUFFER_WRITE_CHUNK_BYTES = 2 * 1024

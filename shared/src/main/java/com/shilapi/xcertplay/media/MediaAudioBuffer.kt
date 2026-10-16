@@ -17,6 +17,18 @@ object MediaAudioBuffer {
 
     data class Plan(val trackBufferBytes: Int, val startBytes: Int)
 
+    /** Older WM firmware receives guidance in bursts; leave call/Siri round-trip latency alone. */
+    internal fun plan(channel: AudioChannel, sdk: Int, sampleRate: Int, channels: Int,
+        minBufferBytes: Int, mediaMillis: Int): Plan {
+        val base = plan(channel == AudioChannel.MEDIA, sampleRate, channels, minBufferBytes, mediaMillis)
+        if (sdk > 23 || channel != AudioChannel.NAVIGATION) return base
+        val bytesPerSecond = sampleRate.toLong() * channels.coerceIn(1, 2) * 2
+        return Plan(
+            trackBufferBytes = maxOf(base.trackBufferBytes, (bytesPerSecond * 400 / 1000).toInt()),
+            startBytes = maxOf(base.startBytes, (bytesPerSecond * 200 / 1000).toInt()),
+        )
+    }
+
     /** AudioTrack capacity and the amount to queue before play() for one output stream. */
     fun plan(isMedia: Boolean, sampleRate: Int, channels: Int, minBufferBytes: Int, mediaMillis: Int): Plan {
         val lowLatency = Plan(

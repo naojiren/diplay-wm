@@ -271,6 +271,7 @@ class CarPlayController(
 
     @Volatile private var hotspot: WirelessHotspotManager? = null
     @Volatile private var wifiScanPause: WifiScanPause? = null
+    @Volatile private var wmWifiPerformance: com.shilapi.xcertplay.network.WmWifiPerformanceGuard? = null
     @Volatile private var bonjour: CarPlayBonjour? = null
     private val wirelessResourceLock = Any()
     private val wirelessFailureReported = AtomicBoolean(false)
@@ -1191,6 +1192,13 @@ class CarPlayController(
                 return
             }
             pauseWifiScans(hotspotInfo.backend)
+            synchronized(wirelessResourceLock) {
+                if (!isStaleWirelessRun(generation) &&
+                    com.shilapi.xcertplay.network.WmWifiPerformanceGuard.eligible(packageName = appContext.packageName)) {
+                    wmWifiPerformance?.close()
+                    wmWifiPerformance = com.shilapi.xcertplay.network.WmWifiPerformanceGuard(appContext, ::debugLog).also { it.start() }
+                }
+            }
             val startedHotspot = hotspot
             wirelessConnectionProof.begin(generation) {
                 if (!isStaleWirelessRun(generation)) startedHotspot?.onCarPlayConfirmed()
@@ -2447,6 +2455,9 @@ class CarPlayController(
             bonjour = null
             if (activeBonjour != null) closeBestEffort("Bonjour") { activeBonjour.close() }
 
+            val activeWmPerformance = wmWifiPerformance
+            wmWifiPerformance = null
+            if (activeWmPerformance != null) closeBestEffort("WM Wi-Fi performance") { activeWmPerformance.close() }
             val activeHotspot = hotspot
             hotspot = null
             if (activeHotspot != null) closeBestEffort("wireless hotspot") { activeHotspot.close() }
